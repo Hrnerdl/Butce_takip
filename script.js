@@ -1,83 +1,110 @@
-// --- VERİ YAPISI VE AYARLAR ---
+// --- VERİ YAPISI ---
 let data = {
     loans: [],
     expenses: [],
-    incomes: {}
+    incomes: [] // ARTIK ARRAY OLARAK TUTULUYOR (Çoklu giriş ve düzenleme için)
 };
 
-// Excelden aldığım hazır veriler (Senin için buraya gömdüm)
+// Excelden Eksik Olan 7 ve 8. Taksitleri Tahmini Ekledim (Kullanıcı düzeltebilir)
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
     { id: 102, no: 2, date: '2026-08-06', total: 146388.89 },
     { id: 103, no: 3, date: '2026-11-06', total: 140958.33 },
     { id: 104, no: 4, date: '2027-02-06', total: 136118.06 },
     { id: 105, no: 5, date: '2027-05-06', total: 129447.92 },
-    { id: 106, no: 6, date: '2027-08-06', total: 124409.72 }
+    { id: 106, no: 6, date: '2027-08-06', total: 124409.72 },
+    // EKLENEN YENİ TAKSİTLER (Tahmini/Boş)
+    { id: 107, no: 7, date: '2027-11-06', total: 120000.00 }, // Kullanıcı düzenlesin
+    { id: 108, no: 8, date: '2028-02-06', total: 115000.00 }  // Kullanıcı düzenlesin
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
-    renderDashboard();
-    renderLoanTags();
+    renderAll();
 });
 
-// --- VERİ YÖNETİMİ ---
 function loadData() {
-    const stored = localStorage.getItem('finansTekEkran');
+    const stored = localStorage.getItem('finansProV2');
     if (stored) {
         data = JSON.parse(stored);
+        // Eski veri yapısından (income object) yeniye (income array) geçiş kontrolü
+        if (!Array.isArray(data.incomes)) {
+            const newIncomes = [];
+            for (const [key, value] of Object.entries(data.incomes)) {
+                newIncomes.push({ id: Date.now() + Math.random(), date: key + '-01', desc: 'Gelir Girişi', amount: value });
+            }
+            data.incomes = newIncomes;
+            saveData();
+        }
     } else {
-        // İlk açılışta veriler boşsa kredileri yükle
         data.loans = [...PRELOADED_LOANS];
-        // Örnek bir kasa geliri de atalım
-        data.incomes['2026-03'] = 117000;
+        // Örnek Başlangıç
+        data.incomes.push({ id: 1, date: '2026-03-15', desc: 'Maaş+Ek', amount: 117000 });
         saveData();
     }
 }
 
 function saveData() {
-    localStorage.setItem('finansTekEkran', JSON.stringify(data));
-    renderDashboard();
-    renderLoanTags();
+    localStorage.setItem('finansProV2', JSON.stringify(data));
+    renderAll();
 }
 
 function resetData() {
-    if(confirm("Tüm veriler silinecek ve başlangıç ayarlarına dönülecek. Emin misin?")) {
-        localStorage.removeItem('finansTekEkran');
+    if(confirm("Tüm veriler silinecek! Onaylıyor musun?")) {
+        localStorage.removeItem('finansProV2');
         location.reload();
     }
 }
 
 function exportData() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "finans_yedek.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+    const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    const a = document.createElement('a');
+    a.href = str; a.download = "finans_yedek.json";
+    document.body.appendChild(a); a.click(); a.remove();
 }
 
-// --- GÖRÜNÜM (RENDER) FONKSİYONLARI ---
+// --- GÖRÜNÜM YÖNETİMİ ---
+function switchView(viewId) {
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(`view-${viewId}`).classList.add('active');
+    
+    // Buton aktifliği
+    if(viewId === 'dashboard') document.querySelectorAll('.nav-btn')[0].classList.add('active');
+    if(viewId === 'transactions') document.querySelectorAll('.nav-btn')[1].classList.add('active');
+    if(viewId === 'loans') document.querySelectorAll('.nav-btn')[2].classList.add('active');
 
+    if(viewId === 'transactions') filterTransactions('all');
+}
+
+function renderAll() {
+    renderDashboard();
+    renderLoans();
+    // Transaction listesi talep edildiğinde render edilir
+}
+
+// --- DASHBOARD ---
 function renderDashboard() {
     const tbody = document.getElementById('dashboard-body');
     const selectedYear = document.getElementById('year-filter').value;
     tbody.innerHTML = '';
 
-    // Aylar listesi oluştur (Seçili yılın tüm ayları)
     let grandTotal = 0;
 
     for (let m = 1; m <= 12; m++) {
         const monthStr = m < 10 ? `0${m}` : `${m}`;
         const ym = `${selectedYear}-${monthStr}`;
-        
-        // Hesaplamalar
-        const income = data.incomes[ym] || 0;
-        const expenseDetails = data.expenses.filter(e => e.date.startsWith(ym));
-        const totalExpense = expenseDetails.reduce((sum, e) => sum + e.amount, 0);
-        
-        // Kredi Hesaplama (Vade tarihi o ay veya önceki 2 ay ise)
+
+        // Gelir Toplamı
+        const monthIncomes = data.incomes.filter(i => i.date.startsWith(ym));
+        const totalIncome = monthIncomes.reduce((sum, i) => sum + i.amount, 0);
+
+        // Gider Toplamı
+        const monthExpenses = data.expenses.filter(e => e.date.startsWith(ym));
+        const totalExpense = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        // Kredi Kesintisi (1/3 Kuralı)
         let creditCut = 0;
         data.loans.forEach(l => {
             if (isLoanActiveMonth(l.date, ym)) {
@@ -85,230 +112,270 @@ function renderDashboard() {
             }
         });
 
-        const net = income - creditCut - totalExpense;
+        const net = totalIncome - creditCut - totalExpense;
         grandTotal += net;
 
-        // Satır Oluşturma
-        const monthName = new Date(`${ym}-01`).toLocaleString('tr-TR', { month: 'long' });
-        
-        // Eğer o ayda hiç hareket yoksa ve gelecekteyse gri gösterilebilir ama şimdilik hepsini gösterelim
-        const rowColor = net < 0 ? 'color:#d63031; font-weight:bold;' : 'color:#00b894; font-weight:bold;';
-
-        const tr = `
+        const row = `
             <tr>
-                <td>${monthName} ${selectedYear}</td>
-                <td class="text-right">${formatMoney(income)}</td>
-                <td class="text-right" style="color:#e17055">${formatMoney(creditCut)}</td>
-                <td class="text-right" onclick="showExpenseDetail('${ym}')" style="cursor:pointer; text-decoration:underline;">
-                    ${formatMoney(totalExpense)}
-                </td>
-                <td class="text-right" style="${rowColor}">${formatMoney(net)}</td>
-                <td>
-                    <button class="btn-text" onclick="editMonth('${ym}', ${income})"><i class="fas fa-edit"></i></button>
-                </td>
+                <td>${getMonthName(m)}</td>
+                <td class="text-right" style="color:var(--green)">${formatMoney(totalIncome)}</td>
+                <td class="text-right" style="color:var(--blue)">${formatMoney(creditCut)}</td>
+                <td class="text-right" style="color:var(--red)">${formatMoney(totalExpense)}</td>
+                <td class="text-right" style="font-weight:bold; color:${net<0?'red':'green'}">${formatMoney(net)}</td>
             </tr>
         `;
-        tbody.innerHTML += tr;
+        tbody.innerHTML += row;
     }
-    
     document.getElementById('grand-total').innerText = formatMoney(grandTotal);
 }
 
-function renderLoanTags() {
-    const container = document.getElementById('loan-tags');
-    container.innerHTML = '';
-    data.loans.sort((a,b) => new Date(a.date) - new Date(b.date));
+// --- HAREKET LİSTESİ (TRANSACTIONS) ---
+function filterTransactions(type) {
+    const list = document.getElementById('transaction-list');
+    list.innerHTML = '';
     
-    data.loans.forEach(l => {
-        const tag = `
-        <div class="loan-tag">
-            <div>
-                <div><small>Taksit ${l.no}</small></div>
-                <span>${formatMoney(l.total)}</span>
-                <div style="font-size:10px; color:#666">${formatDateTR(l.date)}</div>
+    // Tab butonlarını güncelle
+    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    let items = [];
+    
+    if (type === 'all' || type === 'income') {
+        data.incomes.forEach(i => items.push({...i, type: 'income'}));
+    }
+    if (type === 'all' || type === 'expense') {
+        data.expenses.forEach(e => items.push({...e, type: 'expense'}));
+    }
+
+    // Tarihe göre sırala (En yeni en üstte)
+    items.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    if(items.length === 0) {
+        list.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Kayıt bulunamadı.</div>';
+        return;
+    }
+
+    items.forEach(item => {
+        const isInc = item.type === 'income';
+        const cssClass = isInc ? 'income-tag' : 'expense-tag';
+        const icon = isInc ? 'fa-arrow-up' : 'fa-arrow-down';
+        const color = isInc ? 'var(--green)' : 'var(--red)';
+        
+        const html = `
+        <div class="trans-item ${cssClass}">
+            <div class="trans-left">
+                <h4>${item.desc || (isInc ? 'Gelir' : 'Harcama')}</h4>
+                <p><i class="far fa-calendar"></i> ${formatDateTR(item.date)}</p>
             </div>
-            <button onclick="deleteLoan(${l.id})"><i class="fas fa-trash"></i></button>
+            <div class="trans-right">
+                <span class="trans-amt" style="color:${color}">${isInc ? '+' : '-'}${formatMoney(item.amount)}</span>
+                <div class="trans-actions">
+                    <button onclick="openEditModal('${item.type}', ${item.id})"><i class="fas fa-edit"></i></button>
+                    <button class="del" onclick="deleteItem('${item.type}', ${item.id})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
         </div>`;
-        container.innerHTML += tag;
+        list.innerHTML += html;
     });
 }
 
-// --- MODAL VE FORM İŞLEMLERİ ---
+function deleteItem(type, id) {
+    if(!confirm("Silmek istiyor musunuz?")) return;
+    
+    if(type === 'income') data.incomes = data.incomes.filter(i => i.id !== id);
+    if(type === 'expense') data.expenses = data.expenses.filter(e => e.id !== id);
+    
+    saveData();
+    filterTransactions(type === 'income' ? 'income' : (type === 'expense' ? 'expense' : 'all'));
+}
 
-let currentModalType = '';
-let editingMonth = '';
+// --- KREDİ LİSTESİ ---
+function renderLoans() {
+    const container = document.getElementById('loan-list-full');
+    container.innerHTML = '';
+    
+    data.loans.sort((a,b) => new Date(a.date) - new Date(b.date));
 
-function openModal(type, extraData = null) {
-    currentModalType = type;
+    data.loans.forEach(l => {
+        const monthly = l.total / 3;
+        const html = `
+        <div class="loan-card">
+            <div class="loan-header">
+                <span>Taksit #${l.no}</span>
+                <span>${formatDateTR(l.date)}</span>
+            </div>
+            <div class="loan-body">
+                <h3>${formatMoney(l.total)}</h3>
+                <small style="color:var(--blue)">Aylık Ayrılan: ${formatMoney(monthly)}</small>
+            </div>
+            <div class="loan-footer">
+                <div class="loan-actions" style="display:block; position:static; text-align:right;">
+                     <button class="btn-text" onclick="editLoan(${l.id})"><i class="fas fa-edit"></i> Düzenle</button>
+                </div>
+            </div>
+        </div>`;
+        container.innerHTML += html;
+    });
+}
+
+function editLoan(id) {
+    const loan = data.loans.find(l => l.id === id);
+    if(!loan) return;
+    
+    const newTotal = prompt(`Taksit #${loan.no} için yeni tutarı girin:`, loan.total);
+    if(newTotal !== null) {
+        loan.total = parseTrMoney(newTotal);
+        saveData();
+    }
+}
+
+// --- MODAL VE FORM ---
+let editMode = false;
+let currentEditId = null;
+
+function openModal(type) {
+    editMode = false;
+    currentEditId = null;
+    showModalForm(type);
+}
+
+function openEditModal(type, id) {
+    editMode = true;
+    currentEditId = id;
+    
+    let item;
+    if(type === 'income') item = data.incomes.find(i => i.id === id);
+    if(type === 'expense') item = data.expenses.find(e => e.id === id);
+    
+    showModalForm(type, item);
+}
+
+function showModalForm(type, item = null) {
     const overlay = document.getElementById('modal-overlay');
     const title = document.getElementById('modal-title');
     const form = document.getElementById('active-form');
     
     overlay.classList.add('active');
-    form.innerHTML = ''; // Temizle
+    
+    // Default Değerler
+    const dateVal = item ? item.date : new Date().toISOString().split('T')[0];
+    const descVal = item ? item.desc : '';
+    const amountVal = item ? item.amount.toLocaleString('tr-TR', {minimumFractionDigits: 2}) : '';
 
     if (type === 'income') {
-        title.innerText = "Gelir / Kasa Girişi";
+        title.innerText = editMode ? "Gelir Düzenle" : "Gelir Ekle";
         form.innerHTML = `
-            <label>Dönem (Ay seçiniz)</label>
-            <input type="month" id="inp-date" required value="${new Date().toISOString().slice(0,7)}">
+            <input type="hidden" id="form-type" value="income">
+            <label>Tarih</label>
+            <input type="date" id="inp-date" value="${dateVal}">
+            <label>Açıklama</label>
+            <input type="text" id="inp-desc" placeholder="Örn: Maaş" value="${descVal}">
             <label>Tutar</label>
-            <input type="text" inputmode="decimal" id="inp-amount" placeholder="Örn: 15.000,50" oninput="formatInput(this)">
-            <button type="button" class="btn btn-green" style="width:100%" onclick="submitForm()">Kaydet</button>
+            <input type="text" id="inp-amount" inputmode="decimal" placeholder="10.000,00" value="${amountVal}">
+            <button type="button" class="btn btn-green" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>
         `;
     } 
     else if (type === 'expense') {
-        title.innerText = "Harcama Ekle";
+        title.innerText = editMode ? "Harcama Düzenle" : "Harcama Ekle";
         form.innerHTML = `
+            <input type="hidden" id="form-type" value="expense">
             <label>Tarih</label>
-            <input type="date" id="inp-date" required value="${new Date().toISOString().slice(0,10)}">
+            <input type="date" id="inp-date" value="${dateVal}">
             <label>Açıklama</label>
-            <input type="text" id="inp-desc" placeholder="Örn: Market">
+            <input type="text" id="inp-desc" placeholder="Örn: Market" value="${descVal}">
             <label>Tutar</label>
-            <input type="text" inputmode="decimal" id="inp-amount" placeholder="Örn: 1.250,90" oninput="formatInput(this)">
-            <button type="button" class="btn btn-red" style="width:100%" onclick="submitForm()">Kaydet</button>
+            <input type="text" id="inp-amount" inputmode="decimal" placeholder="1.000,50" value="${amountVal}">
+            <button type="button" class="btn btn-red" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>
         `;
     }
     else if (type === 'loan') {
         title.innerText = "Yeni Kredi Taksiti";
         form.innerHTML = `
+            <input type="hidden" id="form-type" value="loan">
             <label>Taksit No</label>
-            <input type="number" id="inp-no" placeholder="Örn: 7">
+            <input type="number" id="inp-no" placeholder="Örn: 9">
             <label>Vade Tarihi</label>
-            <input type="date" id="inp-date" required>
-            <label>Toplam Tutar</label>
-            <input type="text" inputmode="decimal" id="inp-amount" placeholder="Örn: 150.000,00" oninput="formatInput(this)">
-            <button type="button" class="btn btn-blue" style="width:100%" onclick="submitForm()">Kaydet</button>
+            <input type="date" id="inp-date" value="${dateVal}">
+            <label>Tutar</label>
+            <input type="text" id="inp-amount" inputmode="decimal" placeholder="100.000,00">
+            <button type="button" class="btn btn-blue" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>
         `;
     }
 }
 
-function editMonth(ym, currentIncome) {
-    // Hızlı gelir düzenleme
-    const newIncomeStr = prompt(`${ym} dönemi için Kasa Geliri:`, currentIncome);
-    if (newIncomeStr !== null) {
-        // Virgül/Nokta temizliği yapıp kaydet
-        const cleanVal = parseTrMoney(newIncomeStr);
-        if (!isNaN(cleanVal)) {
-            data.incomes[ym] = cleanVal;
-            saveData();
-        }
-    }
-}
+function submitForm() {
+    const type = document.getElementById('form-type').value;
+    const date = document.getElementById('inp-date').value;
+    const desc = document.getElementById('inp-desc') ? document.getElementById('inp-desc').value : '';
+    const amountStr = document.getElementById('inp-amount').value;
+    const amount = parseTrMoney(amountStr);
 
-function showExpenseDetail(ym) {
-    const exps = data.expenses.filter(e => e.date.startsWith(ym));
-    let msg = `${ym} Harcamaları:\n\n`;
-    if(exps.length === 0) msg += "Harcama bulunamadı.";
-    
-    exps.forEach(e => {
-        msg += `- ${e.desc}: ${formatMoney(e.amount)} (Tarih: ${e.date})\n`;
-    });
-    
-    if(exps.length > 0) msg += `\nSilmek için 'Harcamalar' menüsünü kullanın (Sonraki güncellemede eklenecek)`;
-    alert(msg);
+    if(!date || isNaN(amount)) return alert("Lütfen tarih ve tutarı kontrol edin.");
+
+    if(type === 'income') {
+        if(editMode) {
+            const item = data.incomes.find(i => i.id === currentEditId);
+            item.date = date; item.desc = desc; item.amount = amount;
+        } else {
+            data.incomes.push({ id: Date.now(), date, desc, amount });
+        }
+        filterTransactions('income');
+    }
+    else if(type === 'expense') {
+        if(editMode) {
+            const item = data.expenses.find(e => e.id === currentEditId);
+            item.date = date; item.desc = desc; item.amount = amount;
+        } else {
+            data.expenses.push({ id: Date.now(), date, desc, amount });
+        }
+        filterTransactions('expense');
+    }
+    else if(type === 'loan') {
+        const no = document.getElementById('inp-no').value;
+        data.loans.push({ id: Date.now(), no, date, total: amount });
+        switchView('loans');
+    }
+
+    saveData();
+    closeModal();
+    if(document.getElementById('view-transactions').classList.contains('active')) {
+        // Liste görünümündeysek listeyi yenile
+        const activeFilter = document.querySelector('.filter-tab.active').innerText;
+        if(activeFilter === 'Tümü') filterTransactions('all');
+        else if(activeFilter === 'Gelirler') filterTransactions('income');
+        else filterTransactions('expense');
+    }
 }
 
 function closeModal() {
     document.getElementById('modal-overlay').classList.remove('active');
 }
 
-function submitForm() {
-    const amountStr = document.getElementById('inp-amount').value;
-    const amount = parseTrMoney(amountStr);
-    
-    if (isNaN(amount) || amount === 0) {
-        alert("Lütfen geçerli bir tutar giriniz");
-        return;
-    }
-
-    if (currentModalType === 'income') {
-        const date = document.getElementById('inp-date').value; // YYYY-MM
-        if(!date) return alert("Tarih seçiniz");
-        data.incomes[date] = amount;
-    }
-    else if (currentModalType === 'expense') {
-        const date = document.getElementById('inp-date').value;
-        const desc = document.getElementById('inp-desc').value;
-        if(!date) return alert("Tarih seçiniz");
-        data.expenses.push({ id: Date.now(), date, desc, amount });
-    }
-    else if (currentModalType === 'loan') {
-        const date = document.getElementById('inp-date').value;
-        const no = document.getElementById('inp-no').value;
-        if(!date) return alert("Tarih seçiniz");
-        data.loans.push({ id: Date.now(), no, date, total: amount });
-    }
-
-    saveData();
-    closeModal();
+// --- UTILS ---
+function parseTrMoney(str) {
+    if(typeof str === 'number') return str;
+    if(!str) return 0;
+    // 15.000,50 -> 15000.50
+    return parseFloat(str.replace(/\./g, '').replace(',', '.'));
 }
 
-function deleteLoan(id) {
-    if(confirm("Bu kredi taksitini silmek istediğine emin misin?")) {
-        data.loans = data.loans.filter(l => l.id !== id);
-        saveData();
-    }
-}
-
-// --- YARDIMCI (UTILITY) FONKSİYONLAR ---
-
-// 3 Ayda bir ödeme mantığı kontrolü
-function isLoanActiveMonth(loanDateStr, currentMonthStr) {
-    // loanDate: 2026-05-06 -> Vade Ayı: 2026-05
-    // Bu kredi için 2026-03, 2026-04 ve 2026-05 aylarında para ayrılır.
-    
-    const dLimit = new Date(loanDateStr);
-    dLimit.setDate(1); // Ayın ilk günü yapalım karşılaştırma kolay olsun
-    
-    // Kontrol edilen ay
-    const dCheck = new Date(currentMonthStr + "-01");
-    
-    // Ay farkını hesapla (Yaklaşık)
-    const diffTime = dLimit.getTime() - dCheck.getTime();
-    const diffDays = diffTime / (1000 * 3600 * 24); 
-    
-    // Eğer vade ayı ile şimdiki ay arasında 0 ile 95 gün fark varsa (yaklaşık 3 ay)
-    // Daha kesin mantık:
-    // Vade ayı: 5. Check: 5 -> Eşit (1. taksit)
-    // Vade ayı: 5. Check: 4 -> 1 ay önce (2. taksit)
-    // Vade ayı: 5. Check: 3 -> 2 ay önce (3. taksit)
-    // Vade ayı: 5. Check: 2 -> HAYIR.
-    
-    // Basitçe ayları integer'a çevirip fark alalım (Yıl farkını da katarak)
-    const monthIndexLoan = dLimit.getFullYear() * 12 + dLimit.getMonth();
-    const monthIndexCheck = dCheck.getFullYear() * 12 + dCheck.getMonth();
-    
-    const diff = monthIndexLoan - monthIndexCheck;
-    
-    return diff >= 0 && diff < 3;
-}
-
-// Para Formatlama (Türk Lirası ve Virgül)
 function formatMoney(amount) {
     return amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
 }
 
-// Tarih Formatlama
 function formatDateTR(dateStr) {
     const parts = dateStr.split('-');
     return `${parts[2]}.${parts[1]}.${parts[0]}`;
 }
 
-// Kullanıcı 15.000,50 yazdığında bunu JS float'a (15000.50) çevirir
-function parseTrMoney(str) {
-    if (!str) return 0;
-    // Eğer sadece sayı ise direkt döndür
-    if (typeof str === 'number') return str;
-    
-    // Noktaları (binlik ayracı) sil, Virgülü noktaya çevir
-    // Örn: "15.000,50" -> "15000,50" -> "15000.50"
-    let clean = str.replace(/\./g, '').replace(',', '.');
-    return parseFloat(clean);
+function getMonthName(m) {
+    const date = new Date(2023, m - 1);
+    return date.toLocaleString('tr-TR', { month: 'long' });
 }
 
-// Input alanına yazarken virgül kontrolü (Opsiyonel UX)
-function formatInput(input) {
-    // Sadece rakam, nokta ve virgül'e izin ver
-    // Bu basit bir UX iyileştirmesidir, esas çeviri parseTrMoney'de yapılır.
+function isLoanActiveMonth(loanDateStr, currentMonthStr) {
+    const dLimit = new Date(loanDateStr); dLimit.setDate(1);
+    const dCheck = new Date(currentMonthStr + "-01");
+    const diff = (dLimit.getFullYear()*12 + dLimit.getMonth()) - (dCheck.getFullYear()*12 + dCheck.getMonth());
+    return diff >= 0 && diff < 3;
 }

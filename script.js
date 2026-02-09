@@ -1,6 +1,8 @@
 // --- VERİ YAPISI ---
-let data = { loans: [], expenses: [], incomes: [] };
+let data = { loans: [], expenses: [], incomes: [], recurring: [] };
+let myChart = null;
 
+// Hazır Krediler
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
     { id: 102, no: 2, date: '2026-08-06', total: 146388.89 },
@@ -15,21 +17,23 @@ const PRELOADED_LOANS = [
 document.addEventListener('DOMContentLoaded', () => { loadData(); renderAll(); });
 
 function loadData() {
-    const stored = localStorage.getItem('finansProV3');
+    const stored = localStorage.getItem('finansProMax');
     if (stored) {
         data = JSON.parse(stored);
         if (!Array.isArray(data.incomes)) data.incomes = [];
+        if (!data.recurring) data.recurring = []; // Eski sürümler için
     } else {
         data.loans = [...PRELOADED_LOANS];
         data.incomes.push({ id: 1, date: '2026-03-15', desc: 'Maaş', amount: 117000 });
         saveData();
     }
 }
-function saveData() { localStorage.setItem('finansProV3', JSON.stringify(data)); renderAll(); }
-function resetData() { if(confirm("Tüm veriler silinsin mi?")) { localStorage.removeItem('finansProV3'); location.reload(); } }
+function saveData() { localStorage.setItem('finansProMax', JSON.stringify(data)); renderAll(); }
+function resetData() { if(confirm("Her şey silinsin mi?")) { localStorage.removeItem('finansProMax'); location.reload(); } }
 function exportData() {
-    const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
-    const a = document.createElement('a'); a.href = str; a.download = "finans_yedek.json";
+    const a = document.createElement('a');
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    a.download = "finans_yedek.json";
     document.body.appendChild(a); a.click(); a.remove();
 }
 
@@ -37,30 +41,23 @@ function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${viewId}`).classList.add('active');
-    if(viewId==='dashboard') document.querySelectorAll('.nav-btn')[0].classList.add('active');
-    if(viewId==='transactions') { document.querySelectorAll('.nav-btn')[1].classList.add('active'); filterTransactions('all'); }
-    if(viewId==='loans') document.querySelectorAll('.nav-btn')[2].classList.add('active');
+    
+    // Buton aktifliği
+    const navs = document.querySelectorAll('.nav-btn');
+    if(viewId==='dashboard') navs[0].classList.add('active');
+    if(viewId==='transactions') { navs[1].classList.add('active'); filterTransactions('all'); }
+    if(viewId==='loans') navs[2].classList.add('active');
 }
 
 function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); }
 
-function updateCurrentStatusCard() {
-    const date = new Date();
-    const ym = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}`;
-    const income = data.incomes.filter(i => i.date.startsWith(ym)).reduce((s,i)=>s+i.amount,0);
-    const expense = data.expenses.filter(e => e.date.startsWith(ym)).reduce((s,e)=>s+e.amount,0);
-    let credit = 0;
-    data.loans.forEach(l => { if (isLoanActiveMonth(l.date, ym)) credit += (l.total/3); });
-    
-    document.getElementById('current-status-title').innerText = `${date.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})} DURUM`;
-    document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
-    document.getElementById('status-subtitle').innerText = "Bu ayki net denge";
-}
-
+// --- DASHBOARD & CHART ---
 function renderDashboard() {
     const tbody = document.getElementById('dashboard-body');
     const year = document.getElementById('year-filter').value;
     tbody.innerHTML = '';
+    
+    let labels=[], incData=[], expData=[];
     
     for (let m = 1; m <= 12; m++) {
         const ym = `${year}-${m.toString().padStart(2,'0')}`;
@@ -72,6 +69,7 @@ function renderDashboard() {
         const net = inc - credit - exp;
         const isNow = (new Date().getMonth()+1 === m && new Date().getFullYear() == year);
         
+        // Tablo Satırı
         tbody.innerHTML += `
             <tr style="${isNow?'background:#e3f2fd;font-weight:bold;':''}">
                 <td>${getMonthName(m)}</td>
@@ -80,9 +78,50 @@ function renderDashboard() {
                 <td class="text-right" style="color:var(--red)">${formatMoney(exp)}</td>
                 <td class="text-right" style="color:${net<0?'red':'green'}">${formatMoney(net)}</td>
             </tr>`;
+
+        // Grafik Verisi
+        labels.push(getMonthName(m).substring(0,3));
+        incData.push(inc);
+        expData.push(exp + credit);
     }
+    updateChart(labels, incData, expData, year);
 }
 
+function updateChart(labels, inc, exp, year) {
+    const ctx = document.getElementById('financeChart').getContext('2d');
+    if(myChart) myChart.destroy();
+    
+    myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Gelir', data: inc, backgroundColor: '#2ecc71', borderRadius:4 },
+                { label: 'Gider (Harcama+Kredi)', data: exp, backgroundColor: '#e74c3c', borderRadius:4 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: {position:'bottom'}, title: {display:true, text:`${year} Yılı Özeti`} },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => v/1000 + 'k' } } }
+        }
+    });
+}
+
+function updateCurrentStatusCard() {
+    const date = new Date();
+    const ym = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}`;
+    const income = data.incomes.filter(i => i.date.startsWith(ym)).reduce((s,i)=>s+i.amount,0);
+    const expense = data.expenses.filter(e => e.date.startsWith(ym)).reduce((s,e)=>s+e.amount,0);
+    let credit = 0;
+    data.loans.forEach(l => { if (isLoanActiveMonth(l.date, ym)) credit += (l.total/3); });
+    
+    document.getElementById('current-status-title').innerText = `${date.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})} DURUM`.toUpperCase();
+    document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
+    document.getElementById('status-subtitle').innerText = "Bu ayki net denge";
+}
+
+// --- HAREKETLER (KATEGORİ DESTEKLİ) ---
 function filterTransactions(type) {
     const list = document.getElementById('transaction-list');
     list.innerHTML = '';
@@ -95,15 +134,20 @@ function filterTransactions(type) {
     items.sort((a,b)=>new Date(b.date)-new Date(a.date));
     
     if(items.length===0) list.innerHTML = '<div style="text-align:center;padding:20px;color:#999">Kayıt Yok</div>';
+    
     items.forEach(item => {
         const isInc = item.type==='income';
+        const catBadge = item.category ? `<span class="cat-badge">${item.category}</span>` : '';
+        
         list.innerHTML += `
-        <div class="trans-item ${isInc?'income-tag':'expense-tag'}">
-            <div class="trans-left"><h4>${item.desc}</h4><p>${formatDateTR(item.date)}</p></div>
+        <div class="trans-item" style="border-left:4px solid ${isInc?'var(--green)':'var(--red)'}">
+            <div class="trans-left">
+                <h4>${catBadge}${item.desc}</h4>
+                <p>${formatDateTR(item.date)}</p>
+            </div>
             <div class="trans-right">
                 <span class="trans-amt" style="color:${isInc?'var(--green)':'var(--red)'}">${isInc?'+':'-'}${formatMoney(item.amount)}</span>
                 <div class="trans-actions">
-                    <button onclick="openEditModal('${item.type}', ${item.id})"><i class="fas fa-edit"></i></button>
                     <button onclick="deleteItem('${item.type}', ${item.id})"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
@@ -118,6 +162,7 @@ function deleteItem(type, id) {
     saveData(); filterTransactions(type==='income'?'income':(type==='expense'?'expense':'all'));
 }
 
+// --- KREDİLER ---
 function renderLoans() {
     const c = document.getElementById('loan-list-full'); c.innerHTML='';
     data.loans.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -127,69 +172,138 @@ function renderLoans() {
         <div class="loan-footer"><button class="btn-text" onclick="editLoan(${l.id})"><i class="fas fa-edit"></i> Düzenle</button></div></div>`;
     });
 }
-
 function editLoan(id) {
     const l = data.loans.find(x=>x.id===id);
     const val = prompt(`Taksit #${l.no} yeni tutar:`, l.total);
     if(val) { l.total = parseTrMoney(val); saveData(); }
 }
 
-// --- MODAL & PDF ---
-let editMode = false, currentEditId = null, modalType = '';
+// --- SABİT GİDER YÖNETİMİ ---
+function renderRecurringList() {
+    const list = document.getElementById('recurring-list');
+    if(!list) return; // Modal kapalıysa
+    list.innerHTML = '';
+    
+    if(data.recurring.length === 0) list.innerHTML = '<div style="color:#999;font-size:12px;">Henüz sabit gider eklemedin.</div>';
+
+    data.recurring.forEach((item, idx) => {
+        list.innerHTML += `
+        <div style="display:flex; justify-content:space-between; background:#f9f9f9; padding:8px; margin-bottom:5px; border-radius:6px; align-items:center;">
+            <div><strong>${item.desc}</strong> <small>(${item.category})</small></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span>${formatMoney(item.amount)}</span>
+                <button onclick="deleteRecurring(${idx})" style="color:red;border:none;background:none;"><i class="fas fa-times"></i></button>
+            </div>
+        </div>`;
+    });
+}
+
+function addRecurring() {
+    const desc = document.getElementById('rec-desc').value;
+    const cat = document.getElementById('rec-cat').value;
+    const amount = parseTrMoney(document.getElementById('rec-amount').value);
+    
+    if(!desc || !amount) return alert("Eksik bilgi");
+    
+    data.recurring.push({ desc, category: cat, amount });
+    document.getElementById('rec-desc').value = '';
+    document.getElementById('rec-amount').value = '';
+    saveData();
+    renderRecurringList();
+}
+
+function deleteRecurring(idx) {
+    data.recurring.splice(idx, 1);
+    saveData();
+    renderRecurringList();
+}
+
+function processRecurring() {
+    if(data.recurring.length === 0) return alert("Listede sabit gider yok.");
+    if(!confirm("Bu ayın tarihine (" + new Date().toISOString().slice(0,7) + ") tüm sabit giderler eklensin mi?")) return;
+    
+    const today = new Date().toISOString().slice(0,10);
+    data.recurring.forEach(r => {
+        data.expenses.push({ id: Date.now()+Math.random(), date: today, desc: r.desc, category: r.category, amount: r.amount });
+    });
+    saveData();
+    alert("Sabit giderler harcamalara eklendi!");
+    closeModal();
+}
+
+// --- MODAL YÖNETİMİ ---
+let modalType = '';
 
 function openModal(type) {
-    modalType = type; editMode = false; currentEditId = null;
+    modalType = type;
     document.getElementById('modal-overlay').classList.add('active');
     const title = document.getElementById('modal-title');
     const form = document.getElementById('active-form');
     
     if (type === 'pdf') {
-        title.innerText = "PDF Raporu Oluştur";
-        const today = new Date().toISOString().slice(0,7);
+        title.innerText = "PDF Raporu";
         form.innerHTML = `
-            <label>Hangi Ayın Raporu?</label>
-            <input type="month" id="pdf-month-select" value="${today}">
-            <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="generatePDF()">
-                <i class="fas fa-file-pdf"></i> PDF İndir
-            </button>
+            <label>Hangi Ayın Raporu?</label><input type="month" id="pdf-month-select" value="${new Date().toISOString().slice(0,7)}">
+            <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="generatePDF()"><i class="fas fa-file-pdf"></i> İndir</button>
         `;
-        return;
+    } else if (type === 'recurring') {
+        title.innerText = "Sabit Gider Tanımları";
+        form.innerHTML = `
+            <div style="background:#e3f2fd; padding:10px; border-radius:6px; margin-bottom:15px; font-size:12px;">Buraya eklediklerin otomatik düşmez. Her ay 'Bu Ayın Sabitlerini İşle' butonuna basmalısın.</div>
+            <div id="recurring-list" style="max-height:150px; overflow-y:auto; margin-bottom:15px;"></div>
+            <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
+            <label>Yeni Sabit Ekle</label>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="rec-desc" placeholder="Örn: Kira" style="flex:2">
+                <select id="rec-cat" style="flex:1"><option>Kira</option><option>Fatura</option><option>Diğer</option></select>
+            </div>
+            <input type="text" id="rec-amount" placeholder="Tutar" inputmode="decimal">
+            <button type="button" class="btn btn-green" style="width:100%; margin-top:5px;" onclick="addRecurring()">Listeye Ekle</button>
+            <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="processRecurring()"><i class="fas fa-check-double"></i> Bu Ayın Sabitlerini İşle</button>
+        `;
+        renderRecurringList();
+    } else {
+        // Gelir, Gider, Kredi Formları
+        const lbl = type==='income'?'Gelir':(type==='expense'?'Harcama':'Kredi');
+        title.innerText = `${lbl} Ekle`;
+        const today = new Date().toISOString().split('T')[0];
+        
+        let extraFields = '';
+        if(type === 'expense') {
+            extraFields = `
+            <label>Kategori</label>
+            <select id="inp-cat">
+                <option value="Market">Market & Gıda</option>
+                <option value="Fatura">Fatura</option>
+                <option value="Ulaşım">Ulaşım / Benzin</option>
+                <option value="Giyim">Giyim</option>
+                <option value="Eğlence">Eğlence / Yemek</option>
+                <option value="Sağlık">Sağlık</option>
+                <option value="Diğer">Diğer</option>
+            </select>`;
+        }
+        if(type === 'loan') {
+            extraFields = `<label>Taksit No</label><input type="number" id="inp-no" placeholder="9">`;
+        }
+
+        form.innerHTML = `
+            ${type!=='loan' ? `<label>Tarih</label><input type="date" id="inp-date" value="${today}">` : ''}
+            ${type==='loan' ? `<label>Vade Tarihi</label><input type="date" id="inp-date" value="${today}">` : ''}
+            ${extraFields}
+            ${type!=='loan' ? `<label>Açıklama</label><input type="text" id="inp-desc" placeholder="Detay">` : ''}
+            <label>Tutar</label><input type="text" id="inp-amount" inputmode="decimal" placeholder="0,00">
+            <button type="button" class="btn ${type==='income'?'btn-green':(type==='expense'?'btn-red':'btn-blue')}" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>
+        `;
     }
-    
-    // Diğer formlar (Income/Expense/Loan)
-    showFormFields(type, title, form);
-}
-
-function openEditModal(type, id) {
-    modalType = type; editMode = true; currentEditId = id;
-    document.getElementById('modal-overlay').classList.add('active');
-    const title = document.getElementById('modal-title');
-    const form = document.getElementById('active-form');
-    showFormFields(type, title, form, type==='income'?data.incomes.find(i=>i.id===id):data.expenses.find(e=>e.id===id));
-}
-
-function showFormFields(type, titleEl, formEl, item=null) {
-    const lbl = type==='income'?'Gelir':(type==='expense'?'Harcama':'Kredi');
-    titleEl.innerText = editMode ? `${lbl} Düzenle` : `${lbl} Ekle`;
-    const dVal = item ? item.date : new Date().toISOString().split('T')[0];
-    const desc = item ? item.desc : '';
-    const amt = item ? item.amount.toLocaleString('tr-TR',{minimumFractionDigits:2}) : '';
-    
-    formEl.innerHTML = `
-        ${type!=='loan' ? `<label>Tarih</label><input type="date" id="inp-date" value="${dVal}">` : ''}
-        ${type==='loan' ? `<label>Taksit No</label><input type="number" id="inp-no" placeholder="9">` : ''}
-        ${type==='loan' ? `<label>Vade Tarihi</label><input type="date" id="inp-date" value="${dVal}">` : ''}
-        ${type!=='loan' ? `<label>Açıklama</label><input type="text" id="inp-desc" value="${desc}">` : ''}
-        <label>Tutar</label><input type="text" id="inp-amount" inputmode="decimal" value="${amt}">
-        <button type="button" class="btn ${type==='income'?'btn-green':(type==='expense'?'btn-red':'btn-blue')}" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>
-    `;
 }
 
 function submitForm() {
-    if (modalType === 'pdf') return; // PDF butonu ayrı
+    if (modalType === 'pdf' || modalType === 'recurring') return;
+    
     const date = document.getElementById('inp-date').value;
     const amount = parseTrMoney(document.getElementById('inp-amount').value);
     const desc = document.getElementById('inp-desc') ? document.getElementById('inp-desc').value : '';
+    const cat = document.getElementById('inp-cat') ? document.getElementById('inp-cat').value : '';
     
     if(!date || isNaN(amount)) return alert("Eksik bilgi!");
     
@@ -198,92 +312,54 @@ function submitForm() {
         switchView('loans');
     } else {
         const list = modalType==='income' ? data.incomes : data.expenses;
-        if(editMode) {
-            const i = list.find(x=>x.id===currentEditId);
-            i.date=date; i.desc=desc; i.amount=amount;
-        } else {
-            list.push({id:Date.now(), date, desc, amount});
-        }
+        list.push({id:Date.now(), date, desc, category: cat, amount});
         filterTransactions(modalType);
     }
     saveData(); closeModal();
 }
 
-// --- PDF OLUŞTURMA MOTORU ---
 function generatePDF() {
     const ym = document.getElementById('pdf-month-select').value;
     if(!ym) return alert("Ay seçiniz");
+    const [y, m] = ym.split('-');
     
-    // 1. Verileri Hazırla
-    const [year, month] = ym.split('-');
-    const monthName = new Date(year, month-1).toLocaleDateString('tr-TR', {month:'long', year:'numeric'});
-    
-    const incomes = data.incomes.filter(i => i.date.startsWith(ym));
-    const expenses = data.expenses.filter(e => e.date.startsWith(ym));
-    
-    // Kredi (3 Ay kuralı)
-    let loanItems = [];
-    let totalLoanCut = 0;
-    data.loans.forEach(l => {
-        if(isLoanActiveMonth(l.date, ym)) {
-            const cut = l.total/3;
-            totalLoanCut += cut;
-            loanItems.push({ no: l.no, date: l.date, amount: cut });
-        }
-    });
+    // Verileri hazırla
+    const incs = data.incomes.filter(i => i.date.startsWith(ym));
+    const exps = data.expenses.filter(e => e.date.startsWith(ym));
+    let loans = []; let lTotal = 0;
+    data.loans.forEach(l => { if(isLoanActiveMonth(l.date, ym)) { loans.push({no:l.no, date:l.date, val:l.total/3}); lTotal+=l.total/3; } });
 
-    const totalInc = incomes.reduce((s,i)=>s+i.amount,0);
-    const totalExp = expenses.reduce((s,e)=>s+e.amount,0);
-    const net = totalInc - totalLoanCut - totalExp;
+    const totInc = incs.reduce((s,i)=>s+i.amount,0);
+    const totExp = exps.reduce((s,e)=>s+e.amount,0);
 
-    // 2. HTML Şablonunu Doldur
-    document.getElementById('pdf-month-title').innerText = `Dönem: ${monthName}`;
-    document.getElementById('pdf-gen-date').innerText = new Date().toLocaleDateString('tr-TR');
-    
-    document.getElementById('pdf-total-inc').innerText = formatMoney(totalInc);
-    document.getElementById('pdf-total-loan').innerText = formatMoney(totalLoanCut);
-    document.getElementById('pdf-total-exp').innerText = formatMoney(totalExp);
-    document.getElementById('pdf-net').innerText = formatMoney(net);
+    // HTML Doldur
+    document.getElementById('pdf-month-title').innerText = `Dönem: ${getMonthName(m)} ${y}`;
+    document.getElementById('pdf-total-inc').innerText = formatMoney(totInc);
+    document.getElementById('pdf-total-loan').innerText = formatMoney(lTotal);
+    document.getElementById('pdf-total-exp').innerText = formatMoney(totExp);
+    document.getElementById('pdf-net').innerText = formatMoney(totInc - lTotal - totExp);
 
-    // Tabloları Doldur
-    const fillTable = (id, items, col1Func, col2Func, col3Func) => {
-        const tb = document.querySelector(`#${id} tbody`);
-        tb.innerHTML = '';
-        if(items.length === 0) tb.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#999">Kayıt Yok</td></tr>';
-        items.forEach(item => {
-            tb.innerHTML += `<tr><td>${col1Func(item)}</td><td>${col2Func(item)}</td><td class="tr">${col3Func(item)}</td></tr>`;
+    const fill = (id, arr, c1, c2, c3, c4=null) => {
+        const tb = document.querySelector(`#${id} tbody`); tb.innerHTML='';
+        if(arr.length===0) tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:#999">Kayıt Yok</td></tr>';
+        arr.forEach(x => {
+            tb.innerHTML += `<tr><td>${c1(x)}</td><td>${c2(x)}</td>${c4?`<td>${c4(x)}</td>`:''} <td class="tr">${c3(x)}</td></tr>`;
         });
     };
-
-    fillTable('pdf-table-inc', incomes, i=>formatDateTR(i.date), i=>i.desc, i=>formatMoney(i.amount));
-    fillTable('pdf-table-exp', expenses, e=>formatDateTR(e.date), e=>e.desc, e=>formatMoney(e.amount));
-    fillTable('pdf-table-loan', loanItems, l=>`Taksit #${l.no}`, l=>formatDateTR(l.date), l=>formatMoney(l.amount));
-
-    // 3. PDF'e Çevir ve İndir
-    const element = document.getElementById('pdf-template');
-    element.style.display = 'block'; // Geçici olarak görünür yap
     
-    const opt = {
-        margin: 0,
-        filename: `Finans_Raporu_${ym}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 }, // Yüksek çözünürlük
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+    fill('pdf-table-inc', incs, i=>formatDateTR(i.date), i=>i.desc, i=>formatMoney(i.amount));
+    fill('pdf-table-loan', loans, l=>`Taksit #${l.no}`, l=>formatDateTR(l.date), l=>formatMoney(l.val));
+    fill('pdf-table-exp', exps, e=>formatDateTR(e.date), e=>e.category||'-', e=>formatMoney(e.amount), e=>e.desc);
 
-    html2pdf().set(opt).from(element).save().then(() => {
-        element.style.display = 'none'; // Tekrar gizle
-        closeModal();
-    });
+    const el = document.getElementById('pdf-template');
+    el.style.display = 'block';
+    html2pdf().set({ margin:0, filename:`Rapor_${ym}.pdf`, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4'} }).from(el).save().then(()=>{ el.style.display='none'; closeModal(); });
 }
 
+// Utils
 function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
 function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').replace(/\./g,'').replace(',','.')); }
-function formatMoney(n) { return n.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ₺'; }
+function formatMoney(n) { return n.toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ₺'; }
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
-function isLoanActiveMonth(lDate, cDate) {
-    const d1=new Date(lDate), d2=new Date(cDate+'-01'); d1.setDate(1);
-    const diff = (d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth());
-    return diff>=0 && diff<3;
-}
+function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }

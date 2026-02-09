@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Finans Yönetimi Tek Ekran</title>
+    <title>Finans Pro</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -13,77 +13,92 @@
     
     <aside class="sidebar">
         <header>
-            <h1><i class="fas fa-chart-pie"></i> FinansPanel</h1>
+            <h1><i class="fas fa-wallet"></i> Finans Pro</h1>
         </header>
 
         <div class="balance-card">
-            <span>Toplam Tahmini Durum</span>
+            <span>Genel Durum</span>
             <h2 id="grand-total">0,00 ₺</h2>
-            <small>Tüm aylar toplamı</small>
+            <small>Tüm vadeler sonrası kalan</small>
+        </div>
+
+        <div class="nav-menu">
+            <button class="nav-btn active" onclick="switchView('dashboard')">
+                <i class="fas fa-chart-pie"></i> Özet Tablo
+            </button>
+            <button class="nav-btn" onclick="switchView('transactions')">
+                <i class="fas fa-list-ul"></i> Hareketler (Düzenle)
+            </button>
+            <button class="nav-btn" onclick="switchView('loans')">
+                <i class="fas fa-university"></i> Kredi Planı
+            </button>
         </div>
 
         <div class="action-buttons">
-            <button class="btn btn-green" onclick="openModal('income')"><i class="fas fa-plus-circle"></i> Gelir Ekle</button>
-            <button class="btn btn-red" onclick="openModal('expense')"><i class="fas fa-minus-circle"></i> Harcama Ekle</button>
-            <button class="btn btn-blue" onclick="openModal('loan')"><i class="fas fa-university"></i> Kredi İşlemleri</button>
+            <button class="btn btn-green" onclick="openModal('income')"><i class="fas fa-plus"></i> Gelir Ekle</button>
+            <button class="btn btn-red" onclick="openModal('expense')"><i class="fas fa-minus"></i> Harcama Ekle</button>
         </div>
 
         <div class="mini-settings">
-            <button onclick="exportData()" class="btn-text"><i class="fas fa-download"></i> Yedeği İndir</button>
-            <button onclick="resetData()" class="btn-text text-danger"><i class="fas fa-trash-alt"></i> Sıfırla</button>
+            <button onclick="exportData()" class="btn-text"><i class="fas fa-download"></i> Yedekle</button>
+            <button onclick="resetData()" class="btn-text text-danger"><i class="fas fa-trash"></i> Sıfırla</button>
         </div>
     </aside>
 
     <main class="main-content">
-        <div class="table-header">
-            <h2>Aylık Nakit Akışı</h2>
-            <div class="filter-group">
+        
+        <div id="view-dashboard" class="view-section active">
+            <div class="table-header">
+                <h2>Aylık Nakit Akışı</h2>
                 <select id="year-filter" onchange="renderDashboard()">
                     <option value="2026">2026</option>
                     <option value="2027">2027</option>
+                    <option value="2028">2028</option>
                 </select>
+            </div>
+            <div class="table-responsive">
+                <table class="dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Dönem</th>
+                            <th class="text-right">Gelirler</th>
+                            <th class="text-right">Kredi (1/3)</th>
+                            <th class="text-right">Harcamalar</th>
+                            <th class="text-right">Kalan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-body"></tbody>
+                </table>
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="dashboard-table">
-                <thead>
-                    <tr>
-                        <th>Dönem</th>
-                        <th class="text-right">Gelir (Kasa)</th>
-                        <th class="text-right">Kredi Kesintisi (1/3)</th>
-                        <th class="text-right">Harcamalar</th>
-                        <th class="text-right">Kalan Net</th>
-                        <th>Detay</th>
-                    </tr>
-                </thead>
-                <tbody id="dashboard-body">
-                    </tbody>
-            </table>
-        </div>
-
-        <div class="loans-preview">
-            <h3>Aktif Kredi Planı</h3>
-            <div id="loan-tags" class="loan-tags-container">
+        <div id="view-transactions" class="view-section">
+            <div class="table-header">
+                <h2>Hareket Geçmişi</h2>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterTransactions('all')">Tümü</button>
+                    <button class="filter-tab" onclick="filterTransactions('income')">Gelirler</button>
+                    <button class="filter-tab" onclick="filterTransactions('expense')">Harcamalar</button>
+                </div>
+            </div>
+            <div id="transaction-list" class="transaction-list">
                 </div>
         </div>
-    </main>
 
+        <div id="view-loans" class="view-section">
+            <div class="table-header">
+                <h2>Kredi Taksitleri (3 Ayda Bir)</h2>
+                <button class="btn-sm" onclick="openModal('loan')"><i class="fas fa-plus"></i> Yeni Taksit</button>
+            </div>
+            <div id="loan-list-full" class="loan-grid">
+                </div>
+        </div>
+
+    </main>
 </div>
 
 <div id="modal-overlay" class="modal-overlay">
     <div class="modal-card">
         <div class="modal-header">
             <h3 id="modal-title">İşlem</h3>
-            <button onclick="closeModal()" class="close-icon"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <form id="active-form">
-                </form>
-        </div>
-    </div>
-</div>
-
-<script src="script.js"></script>
-</body>
-</html>
+            <button onclick="close

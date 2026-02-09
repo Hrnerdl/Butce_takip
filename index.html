@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Finans Pro</title>
+    <title>Finans Pro Max</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -14,35 +15,38 @@
     
     <aside class="sidebar">
         <header>
-            <h1><i class="fas fa-wallet"></i> Finans Pro</h1>
+            <h1><i class="fas fa-chart-line"></i> Finans Pro</h1>
         </header>
 
         <div class="balance-card">
-            <span id="current-status-title">Genel Durum</span>
+            <span id="current-status-title">GENEL DURUM</span>
             <h2 id="grand-total">0,00 ₺</h2>
             <small id="status-subtitle">Yükleniyor...</small>
         </div>
 
         <div class="nav-menu">
             <button class="nav-btn active" onclick="switchView('dashboard')">
-                <i class="fas fa-chart-pie"></i> Özet Tablo
+                <i class="fas fa-home"></i> Özet & Grafik
             </button>
             <button class="nav-btn" onclick="switchView('transactions')">
-                <i class="fas fa-list-ul"></i> Hareketler
+                <i class="fas fa-list"></i> Hareketler
             </button>
             <button class="nav-btn" onclick="switchView('loans')">
                 <i class="fas fa-university"></i> Kredi Planı
             </button>
+            <button class="nav-btn" onclick="openModal('recurring')">
+                <i class="fas fa-sync-alt"></i> Sabit Giderler
+            </button>
         </div>
 
         <div class="action-buttons">
-            <button class="btn btn-green" onclick="openModal('income')"><i class="fas fa-plus"></i> Gelir Ekle</button>
-            <button class="btn btn-red" onclick="openModal('expense')"><i class="fas fa-minus"></i> Harcama Ekle</button>
+            <button class="btn btn-green" onclick="openModal('income')"><i class="fas fa-plus"></i> Gelir</button>
+            <button class="btn btn-red" onclick="openModal('expense')"><i class="fas fa-minus"></i> Harcama</button>
         </div>
 
         <div class="mini-settings">
             <button onclick="openModal('pdf')" class="btn-text" style="color:#2c3e50; font-weight:bold;">
-                <i class="fas fa-file-pdf"></i> PDF Rapor Al
+                <i class="fas fa-file-pdf"></i> Rapor
             </button>
             <div style="display:flex; gap:10px;">
                 <button onclick="exportData()" class="btn-text"><i class="fas fa-download"></i> Yedek</button>
@@ -55,14 +59,19 @@
         
         <div id="view-dashboard" class="view-section active">
             <div class="table-header">
-                <h2>Aylık Nakit Akışı</h2>
+                <h2>Finansal Genel Bakış</h2>
                 <select id="year-filter" onchange="renderDashboard()">
                     <option value="2026">2026</option>
                     <option value="2027">2027</option>
                     <option value="2028">2028</option>
                 </select>
             </div>
+
+            <div class="chart-container-box">
+                <canvas id="financeChart"></canvas>
+            </div>
             
+            <h3 style="margin-top:20px; font-size:16px; color:#555;">Aylık Nakit Akışı Tablosu</h3>
             <div class="table-scroll-container">
                 <table class="dashboard-table">
                     <thead>
@@ -120,53 +129,25 @@
             <h1>FİNANSAL DURUM RAPORU</h1>
             <p id="pdf-month-title">Dönem: --</p>
         </div>
-        
         <div class="pdf-summary">
-            <div class="p-box p-green">
-                <span>TOPLAM GELİR</span>
-                <h3 id="pdf-total-inc">0 ₺</h3>
-            </div>
-            <div class="p-box p-blue">
-                <span>KREDİ (AYRILAN)</span>
-                <h3 id="pdf-total-loan">0 ₺</h3>
-            </div>
-            <div class="p-box p-red">
-                <span>HARCAMALAR</span>
-                <h3 id="pdf-total-exp">0 ₺</h3>
-            </div>
-            <div class="p-box p-gray">
-                <span>KALAN NET</span>
-                <h3 id="pdf-net">0 ₺</h3>
-            </div>
+            <div class="p-box p-green"><span>TOPLAM GELİR</span><h3 id="pdf-total-inc">0 ₺</h3></div>
+            <div class="p-box p-blue"><span>KREDİ (AYRILAN)</span><h3 id="pdf-total-loan">0 ₺</h3></div>
+            <div class="p-box p-red"><span>HARCAMALAR</span><h3 id="pdf-total-exp">0 ₺</h3></div>
+            <div class="p-box p-gray"><span>KALAN NET</span><h3 id="pdf-net">0 ₺</h3></div>
         </div>
-
         <div class="pdf-section">
             <h3><i class="fas fa-arrow-down"></i> Gelir Detayları</h3>
-            <table class="pdf-table" id="pdf-table-inc">
-                <thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table class="pdf-table" id="pdf-table-inc"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
         </div>
-
         <div class="pdf-section">
             <h3><i class="fas fa-university"></i> Kredi Planı (Bu Aya Düşen)</h3>
-            <table class="pdf-table" id="pdf-table-loan">
-                <thead><tr><th>Kredi/Taksit</th><th>Vade Tarihi</th><th class="tr">Bu Ay Ayrılan</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table class="pdf-table" id="pdf-table-loan"><thead><tr><th>Taksit</th><th>Vade</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
         </div>
-
         <div class="pdf-section">
             <h3><i class="fas fa-arrow-up"></i> Harcama Detayları</h3>
-            <table class="pdf-table" id="pdf-table-exp">
-                <thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table class="pdf-table" id="pdf-table-exp"><thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
         </div>
-
-        <div class="pdf-footer">
-            Bu rapor Finans Pro tarafından <span id="pdf-gen-date"></span> tarihinde oluşturulmuştur.
-        </div>
+        <div class="pdf-footer">Bu rapor Finans Pro Max tarafından oluşturulmuştur.</div>
     </div>
 </div>
 

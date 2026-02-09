@@ -20,47 +20,33 @@ const PRELOADED_LOANS = [
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
     renderAll();
-    updateStatusTitle(); // Yeni Başlık Fonksiyonu
+    // Başlık ve Kart güncellemesi renderAll içinde çağrılır
 });
 
-// YENİ: Başlığı güncel ay/yıl yapma
-function updateStatusTitle() {
-    const date = new Date();
-    const options = { year: 'numeric', month: 'long' };
-    const current = date.toLocaleDateString('tr-TR', options); // Örn: Şubat 2026
-    
-    // Büyük harfle yazmak için
-    document.getElementById('current-status-title').innerText = `${current} DURUM`;
-}
-
 function loadData() {
-    const stored = localStorage.getItem('finansProV2');
+    const stored = localStorage.getItem('finansProV3');
     if (stored) {
         data = JSON.parse(stored);
+        // Eski veri yapısı kontrolü
         if (!Array.isArray(data.incomes)) {
-            const newIncomes = [];
-            for (const [key, value] of Object.entries(data.incomes)) {
-                newIncomes.push({ id: Date.now() + Math.random(), date: key + '-01', desc: 'Gelir Girişi', amount: value });
-            }
-            data.incomes = newIncomes;
-            saveData();
+            data.incomes = []; // Hata önleyici sıfırlama veya eski veriyi dönüştürme
         }
     } else {
         data.loans = [...PRELOADED_LOANS];
-        // Örnek Başlangıç
+        // Örnek Başlangıç (Mart 2026)
         data.incomes.push({ id: 1, date: '2026-03-15', desc: 'Maaş', amount: 117000 });
         saveData();
     }
 }
 
 function saveData() {
-    localStorage.setItem('finansProV2', JSON.stringify(data));
+    localStorage.setItem('finansProV3', JSON.stringify(data));
     renderAll();
 }
 
 function resetData() {
     if(confirm("Tüm veriler silinecek! Onaylıyor musun?")) {
-        localStorage.removeItem('finansProV2');
+        localStorage.removeItem('finansProV3');
         location.reload();
     }
 }
@@ -89,6 +75,37 @@ function switchView(viewId) {
 function renderAll() {
     renderDashboard();
     renderLoans();
+    updateCurrentStatusCard(); // Kartı güncelle
+}
+
+// --- GÜNCEL DURUM KARTI GÜNCELLEME ---
+function updateCurrentStatusCard() {
+    const date = new Date();
+    const currentMonth = date.getMonth() + 1; // 1-12
+    const currentYear = date.getFullYear();
+    
+    // 1. Başlığı Güncelle
+    const monthName = date.toLocaleDateString('tr-TR', { month: 'long' });
+    document.getElementById('current-status-title').innerText = `${monthName} ${currentYear} DURUM`;
+
+    // 2. O Ayın Bakiyesini Hesapla
+    const ym = `${currentYear}-${currentMonth < 10 ? '0'+currentMonth : currentMonth}`;
+    
+    // Gelir
+    const income = data.incomes.filter(i => i.date.startsWith(ym)).reduce((sum, i) => sum + i.amount, 0);
+    // Gider
+    const expense = data.expenses.filter(e => e.date.startsWith(ym)).reduce((sum, e) => sum + e.amount, 0);
+    // Kredi
+    let credit = 0;
+    data.loans.forEach(l => {
+        if (isLoanActiveMonth(l.date, ym)) credit += (l.total / 3);
+    });
+
+    const net = income - credit - expense;
+
+    // 3. Ekrana Yaz
+    document.getElementById('grand-total').innerText = formatMoney(net);
+    document.getElementById('status-subtitle').innerText = `${monthName} Ayı Net Dengesi`;
 }
 
 // --- DASHBOARD ---
@@ -119,9 +136,13 @@ function renderDashboard() {
         const net = totalIncome - creditCut - totalExpense;
         grandTotal += net;
 
+        // Ayın şu anki ay olup olmadığını kontrol et
+        const isCurrentMonth = (new Date().getMonth() + 1 === m) && (new Date().getFullYear() == selectedYear);
+        const rowStyle = isCurrentMonth ? "background-color: #e3f2fd; font-weight:bold;" : "";
+
         const row = `
-            <tr>
-                <td>${getMonthName(m)}</td>
+            <tr style="${rowStyle}">
+                <td>${getMonthName(m)} ${isCurrentMonth ? '(Bu Ay)' : ''}</td>
                 <td class="text-right" style="color:var(--green)">${formatMoney(totalIncome)}</td>
                 <td class="text-right" style="color:var(--blue)">${formatMoney(creditCut)}</td>
                 <td class="text-right" style="color:var(--red)">${formatMoney(totalExpense)}</td>
@@ -130,7 +151,16 @@ function renderDashboard() {
         `;
         tbody.innerHTML += row;
     }
-    document.getElementById('grand-total').innerText = formatMoney(grandTotal);
+    
+    // Yıllık Toplam Satırı
+    const totalRow = `
+        <tr style="background-color:#f8f9fa; border-top:2px solid #ddd; font-weight:bold;">
+            <td>YILLIK TOPLAM</td>
+            <td colspan="3" class="text-right">Yıl Sonu Tahmini Net:</td>
+            <td class="text-right">${formatMoney(grandTotal)}</td>
+        </tr>
+    `;
+    tbody.innerHTML += totalRow;
 }
 
 // --- HAREKET LİSTESİ ---
@@ -288,6 +318,9 @@ function submitForm() {
     }
     saveData();
     closeModal();
+    // Dashboard'ı da yenile ki kart güncellensin
+    renderDashboard();
+    updateCurrentStatusCard();
 }
 
 function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }

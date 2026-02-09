@@ -41,4 +41,61 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Ro
 .view-section.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
 
-.table-header { display: flex; justify-content: space-between; align
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.table-header h2 { font-size: 18px; margin: 0; color: #34495e; }
+
+/* Dashboard Table */
+.dashboard-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.dashboard-table th, .dashboard-table td { padding: 12px 15px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
+.dashboard-table th { background: #f8f9fa; font-weight: 600; color: #7f8c8d; }
+.text-right { text-align: right; }
+
+/* Hareket Listesi */
+.filter-tabs { display: flex; gap: 5px; background: white; padding: 5px; border-radius: 8px; border: 1px solid var(--border); }
+.filter-tab { background: none; border: none; padding: 6px 15px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #555; }
+.filter-tab.active { background: var(--blue); color: white; }
+
+.transaction-list { display: flex; flex-direction: column; gap: 10px; }
+.trans-item { background: white; padding: 15px; border-radius: 10px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.trans-left h4 { margin: 0 0 5px; font-size: 15px; }
+.trans-left p { margin: 0; font-size: 12px; color: #888; }
+.trans-right { text-align: right; display: flex; align-items: center; gap: 15px; }
+.trans-amt { font-weight: bold; font-size: 15px; }
+.trans-actions button { background: none; border: none; cursor: pointer; font-size: 16px; color: #95a5a6; padding: 5px; }
+.trans-actions button:hover { color: var(--blue); }
+.trans-actions button.del:hover { color: var(--red); }
+
+.income-tag { border-left: 4px solid var(--green); }
+.expense-tag { border-left: 4px solid var(--red); }
+
+/* Kredi Grid */
+.loan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+.loan-card { background: white; padding: 15px; border-radius: 10px; border: 1px solid var(--border); position: relative; }
+.loan-header { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-bottom: 10px; }
+.loan-body { text-align: center; margin-bottom: 15px; }
+.loan-body h3 { margin: 0; color: #2c3e50; font-size: 20px; }
+.loan-footer { border-top: 1px dashed #eee; padding-top: 10px; font-size: 12px; color: #555; display: flex; justify-content: space-between; }
+.loan-actions { position: absolute; top: 10px; right: 10px; display: none; }
+.loan-card:hover .loan-actions { display: block; }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal-card { background: white; width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; animation: slideUp 0.3s; }
+.modal-header { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; }
+.modal-body input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+.modal-body label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
+
+@keyframes slideUp { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Mobile */
+@media (max-width: 768px) {
+    .app-container { flex-direction: column; overflow: auto; }
+    .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #ddd; padding: 15px; box-sizing: border-box; }
+    .nav-menu { flex-direction: row; overflow-x: auto; padding-bottom: 5px; }
+    .nav-btn { white-space: nowrap; padding: 8px 12px; font-size: 12px; }
+    .action-buttons { flex-direction: row; }
+    .btn { flex: 1; font-size: 12px; }
+    .dashboard-table { font-size: 12px; }
+    .dashboard-table th, .dashboard-table td { padding: 8px; }
+}

@@ -8,32 +8,13 @@
     --border: #e1e4e8;
 }
 
-/* Masaüstü için varsayılan ayarlar (Sabit ekran) */
-body { 
-    margin: 0; 
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-    background: var(--bg-color); 
-    color: var(--text-main); 
-    height: 100vh; 
-    overflow: hidden; /* Masaüstünde sayfa kaymasın, paneller kaysın */
-}
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg-color); color: var(--text-main); height: 100vh; overflow: hidden; }
 
 .app-container { display: flex; height: 100%; }
 
 /* SIDEBAR */
-.sidebar { 
-    width: 280px; 
-    background: var(--sidebar-bg); 
-    border-right: 1px solid var(--border); 
-    padding: 20px; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 15px; 
-    z-index: 10; 
-    flex-shrink: 0; 
-}
+.sidebar { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 10; flex-shrink: 0; }
 .sidebar header h1 { font-size: 18px; margin: 0; color: #2c3e50; }
-
 .balance-card { background: linear-gradient(135deg, #2c3e50, #4ca1af); color: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 10px; }
 .balance-card h2 { margin: 5px 0; font-size: 24px; }
 .balance-card small { font-size: 11px; opacity: 0.8; }
@@ -50,36 +31,20 @@ body {
 .btn-red { background: var(--red); }
 .btn-sm { padding: 6px 12px; background: var(--blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
 
-.mini-settings { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
-.btn-text { background: none; border: none; color: #7f8c8d; cursor: pointer; font-size: 12px; }
+.mini-settings { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.btn-text { background: none; border: none; color: #7f8c8d; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px;}
 .text-danger { color: var(--red); }
 
 /* MAIN CONTENT */
-.main-content { 
-    flex: 1; 
-    padding: 20px; 
-    overflow-y: auto; /* İçerik taşarsa kaydır */
-    position: relative; 
-    -webkit-overflow-scrolling: touch; /* iOS akıcı kaydırma */
-}
-
-.view-section { display: none; animation: fadeIn 0.3s; padding-bottom: 80px; /* Mobilde en alttaki içerik görünmesi için boşluk */ }
+.main-content { flex: 1; padding: 20px; overflow-y: auto; position: relative; -webkit-overflow-scrolling: touch; }
+.view-section { display: none; animation: fadeIn 0.3s; padding-bottom: 80px; }
 .view-section.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
-
 .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .table-header h2 { font-size: 18px; margin: 0; color: #34495e; }
 
 /* TABLO VE SCROLL */
-.table-scroll-container {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    background: white;
-}
-
+.table-scroll-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); background: white; }
 .dashboard-table { width: 100%; border-collapse: collapse; min-width: 500px; }
 .dashboard-table th, .dashboard-table td { padding: 12px 15px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; white-space: nowrap; }
 .dashboard-table th { background: #f8f9fa; font-weight: 600; color: #7f8c8d; position: sticky; top: 0; z-index: 5; }
@@ -111,55 +76,37 @@ body {
 .modal-overlay.active { display: flex; }
 .modal-card { background: white; width: 90%; max-width: 350px; padding: 20px; border-radius: 12px; }
 .modal-header { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; }
-.modal-body input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+.modal-body input, .modal-body select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
 .modal-body label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
 
-/* --- MOBILE RESPONSIVE (DÜZELTME BURADA) --- */
+/* --- PDF RAPOR STİLLERİ (Sadece PDF içinde geçerli) --- */
+.pdf-container { padding: 40px; background: white; font-family: 'Segoe UI', Arial, sans-serif; width: 700px; /* A4 genişliğine yakın sabit */ margin: 0 auto; color: #333; }
+.pdf-header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; }
+.pdf-header h1 { margin: 0; color: #2c3e50; font-size: 24px; letter-spacing: 1px; }
+.pdf-header p { margin: 5px 0 0; color: #7f8c8d; font-size: 14px; }
+.pdf-summary { display: flex; justify-content: space-between; margin-bottom: 30px; gap: 15px; }
+.p-box { flex: 1; padding: 15px; border-radius: 8px; text-align: center; color: white; }
+.p-green { background-color: #27ae60; } .p-blue { background-color: #2980b9; } .p-red { background-color: #c0392b; } .p-gray { background-color: #7f8c8d; }
+.p-box span { display: block; font-size: 10px; text-transform: uppercase; opacity: 0.9; margin-bottom: 5px; }
+.p-box h3 { margin: 0; font-size: 16px; }
+.pdf-section { margin-bottom: 30px; }
+.pdf-section h3 { font-size: 14px; border-left: 4px solid #34495e; padding-left: 10px; color: #2c3e50; margin-bottom: 15px; background: #f9f9f9; padding: 8px 10px; }
+.pdf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pdf-table th { background: #ecf0f1; padding: 8px; text-align: left; font-weight: bold; color: #555; border-bottom: 1px solid #bdc3c7; }
+.pdf-table td { padding: 8px; border-bottom: 1px solid #eee; }
+.pdf-table th.tr, .pdf-table td.tr { text-align: right; }
+.pdf-footer { text-align: center; font-size: 10px; color: #aaa; margin-top: 50px; border-top: 1px solid #eee; padding-top: 10px; }
+
+/* MOBILE RESPONSIVE */
 @media (max-width: 768px) {
-    /* Gövde kaydırmasını mobilde serbest bırakıyoruz */
-    body {
-        overflow: auto; 
-        height: auto;
-    }
-
-    .app-container { 
-        flex-direction: column; 
-        overflow: visible; 
-        height: auto; 
-        padding-bottom: 20px; 
-    }
-
-    .sidebar { 
-        width: 100%; 
-        border-right: none; 
-        border-bottom: 1px solid #ddd; 
-        padding: 15px; 
-        box-sizing: border-box; 
-    }
-
-    /* Mobilde yatay menü kaydırması */
-    .nav-menu { 
-        flex-direction: row; 
-        overflow-x: auto; 
-        padding-bottom: 5px; 
-        -webkit-overflow-scrolling: touch; 
-    }
-    .nav-btn { 
-        white-space: nowrap; 
-        padding: 8px 12px; 
-        font-size: 12px; 
-        border: 1px solid #eee; 
-    }
+    body { overflow: auto; height: auto; }
+    .app-container { flex-direction: column; overflow: visible; height: auto; padding-bottom: 20px; }
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid #ddd; padding: 15px; box-sizing: border-box; }
+    .nav-menu { flex-direction: row; overflow-x: auto; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
+    .nav-btn { white-space: nowrap; padding: 8px 12px; font-size: 12px; border: 1px solid #eee; }
     .nav-btn.active { border-color: var(--blue); }
-    
     .action-buttons { flex-direction: row; }
     .btn { flex: 1; font-size: 13px; padding: 10px; }
-    
-    .main-content { 
-        padding: 15px; 
-        overflow: visible; /* İçerik kadar uza */
-        height: auto;
-    }
-    
+    .main-content { padding: 15px; overflow: visible; height: auto; }
     .dashboard-table th, .dashboard-table td { padding: 10px 8px; font-size: 13px; }
 }

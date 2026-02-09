@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f2f2f7">
+    <title>Finans Asistanı</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <header class="app-header">
+        <h1 id="page-title">Özet Durum</h1>
+        <button class="add-btn" onclick="openModal()">
+            <i class="fas fa-plus"></i>
+        </button>
+    </header>
+
+    <main class="content-area">
+        
+        <div id="tab-home" class="page active">
+            <div class="summary-card">
+                <span class="label">Güncel Bakiye (Tahmini)</span>
+                <h2 id="total-balance">0,00 ₺</h2>
+            </div>
+            
+            <div class="section-title">Aylık Nakit Akışı</div>
+            <div id="dashboard-list" class="list-container">
+                </div>
+        </div>
+
+        <div id="tab-loans" class="page">
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                Ödemeler otomatik 3'e bölünür.
+            </div>
+            <div id="loans-list" class="list-container">
+                </div>
+        </div>
+
+        <div id="tab-expenses" class="page">
+            <div id="expenses-list" class="list-container">
+                </div>
+        </div>
+
+    </main>
+
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('home')">
+            <i class="fas fa-wallet"></i>
+            <span>Kasa</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('loans')">
+            <i class="fas fa-university"></i>
+            <span>Krediler</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('expenses')">
+            <i class="fas fa-receipt"></i>
+            <span>Harcamalar</span>
+        </button>
+    </nav>
+
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modal-title">Yeni Ekle</span>
+                <button onclick="closeModal()" class="close-btn">Vazgeç</button>
+            </div>
+            <div class="modal-body">
+                
+                <form id="form-home" class="modal-form" style="display:none;">
+                    <label>Dönem (Ay/Yıl)</label>
+                    <input type="month" id="income-date" required>
+                    <label>Mevcut Para / Gelir</label>
+                    <input type="number" id="income-amount" placeholder="Örn: 117000" inputmode="decimal" required>
+                    <button type="submit" class="save-btn">Kaydet</button>
+                </form>
+
+                <form id="form-loans" class="modal-form" style="display:none;">
+                    <label>Taksit No</label>
+                    <input type="number" id="loan-no" placeholder="Örn: 1" inputmode="numeric" required>
+                    <label>Vade Tarihi</label>
+                    <input type="date" id="loan-date" required>
+                    <label>Toplam Taksit Tutarı</label>
+                    <input type="number" id="loan-total" placeholder="0.00" inputmode="decimal" required>
+                    <p class="hint">Bu tutar otomatik olarak önceki 3 aya bölünecektir.</p>
+                    <button type="submit" class="save-btn">Kredi Ekle</button>
+                </form>
+
+                <form id="form-expenses" class="modal-form" style="display:none;">
+                    <label>Tarih</label>
+                    <input type="date" id="exp-date" required>
+                    <label>Açıklama</label>
+                    <input type="text" id="exp-desc" placeholder="Örn: Market, Banka" required>
+                    <label>Tutar</label>
+                    <input type="number" id="exp-amount" placeholder="0.00" inputmode="decimal" required>
+                    <button type="submit" class="save-btn">Harcama Ekle</button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

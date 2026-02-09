@@ -1,6 +1,13 @@
-let data = { loans: [], expenses: [], incomes: [] };
-let myChart = null;
+// --- AYARLAR (BURAYI DOLDURMAN ŞART) ---
+const API_KEY = '$2a$10$qax2LRlX0XBsGP0OVvji2ez3GqFYfSBTSWcwhj.WW1qgqkNUxM0sO'; // JSONBin'den aldığın Master Key (X-Master-Key)
+const BIN_ID = '6989e40ad0ea881f40ad271b';   // JSONBin'den aldığın Bin ID
 
+// --- VERİ YAPISI ---
+let data = { loans: [], expenses: [], incomes: [], recurring: [] };
+let myChart = null;
+let isOffline = false; // İnternet yoksa çalışmaya devam etmesi için
+
+// Hazır Krediler
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
     { id: 102, no: 2, date: '2026-08-06', total: 146388.89 },
@@ -14,49 +21,111 @@ const PRELOADED_LOANS = [
 
 document.addEventListener('DOMContentLoaded', () => { 
     loadTheme();
-    loadData(); 
-    renderAll(); 
+    // Önce buluttan çekmeye çalış, olmazsa yerelden yükle
+    syncFromCloud().then(() => {
+        renderAll();
+    });
 });
 
-// --- THEME ---
+// --- BULUT SENKRONİZASYONU (EN ÖNEMLİ KISIM) ---
+async function syncFromCloud() {
+    updateStatusText("Veriler indiriliyor...", "orange");
+    try {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+            method: 'GET',
+            headers: { 'X-Master-Key': API_KEY }
+        });
+        
+        if (response.ok) {
+            const json = await response.json();
+            // Bulut boşsa veya hata varsa yerel veriyi koru
+            if(json.record && (json.record.loans || json.record.incomes)) {
+                data = json.record;
+                localStorage.setItem('finansProFinal', JSON.stringify(data)); // Yerele de yedekle
+                updateStatusText("Bulut ile Eşleşti ✅", "green");
+            } else {
+                // Bulut boşsa ilk kurulumu yap
+                initializeData();
+                saveData(); 
+            }
+        } else {
+            throw new Error("Bağlantı Hatası");
+        }
+    } catch (error) {
+        console.error("Bulut Hatası:", error);
+        updateStatusText("İnternet Yok - Yerel Mod ⚠️", "red");
+        isOffline = true;
+        // İnternet yoksa yerelden oku
+        const stored = localStorage.getItem('finansProFinal');
+        if (stored) data = JSON.parse(stored);
+        else initializeData();
+    }
+}
+
+async function saveData() {
+    // 1. Önce telefon hafızasına kaydet (Hız için)
+    localStorage.setItem('finansProFinal', JSON.stringify(data));
+    renderAll();
+
+    // 2. Sonra buluta gönder (Yedekleme için)
+    updateStatusText("Buluta Kaydediliyor...", "orange");
+    
+    try {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify(data)
+        });
+
+        if(response.ok) {
+            updateStatusText("Güvende ✅", "green");
+        } else {
+            updateStatusText("Bulut Kayıt Hatası ⚠️", "red");
+        }
+    } catch (e) {
+        updateStatusText("İnternet Yok - Kuyrukta ⚠️", "red");
+    }
+}
+
+function updateStatusText(msg, color) {
+    // Sol menüdeki "Yükleniyor..." yazısını durum çubuğu yapıyoruz
+    const el = document.getElementById('status-subtitle');
+    if(el) {
+        el.innerText = msg;
+        el.style.color = color === 'green' ? '#2ecc71' : (color === 'red' ? '#e74c3c' : '#f1c40f');
+        el.style.fontWeight = 'bold';
+    }
+}
+
+function initializeData() {
+    data.loans = [...PRELOADED_LOANS];
+    for(let m = 2; m <= 12; m++) {
+        let monthStr = m < 10 ? '0' + m : m;
+        data.incomes.push({ id: Date.now() + m, date: `2026-${monthStr}-15`, desc: 'Maaş', category: 'Maaş', amount: 67000 });
+    }
+}
+
+// --- TEMA ---
 function toggleTheme() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
     renderDashboard();
 }
-function loadTheme() {
-    if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
-}
+function loadTheme() { if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); }
 
-// --- DATA ---
-function loadData() {
-    const stored = localStorage.getItem('finansProFinal');
-    if (stored) {
-        data = JSON.parse(stored);
-        if (!Array.isArray(data.incomes)) data.incomes = [];
-    } else {
-        // İLK AÇILIŞ - VERİ OLUŞTURMA
-        data.loans = [...PRELOADED_LOANS];
-        
-        // KULLANICI İSTEĞİ: 2026 Şubat'tan Aralık'a kadar 67.000 TL Maaş
-        for(let m = 2; m <= 12; m++) {
-            let monthStr = m < 10 ? '0' + m : m;
-            data.incomes.push({
-                id: Date.now() + m,
-                date: `2026-${monthStr}-15`, // Her ayın 15'i varsayılan
-                desc: 'Maaş',
-                category: 'Maaş',
-                amount: 67000
-            });
-        }
-        
-        // 2027 için de örnek koyalım mı? Şimdilik sadece 2026 istendi.
-        saveData();
-    }
+// --- DİĞER FONKSİYONLAR (STANDART) ---
+function resetData() { 
+    if(confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) { 
+        localStorage.removeItem('finansProFinal'); 
+        data = { loans: [], expenses: [], incomes: [], recurring: [] };
+        initializeData();
+        saveData(); // Bulutu da sıfırla
+        location.reload(); 
+    } 
 }
-
-function saveData() { localStorage.setItem('finansProFinal', JSON.stringify(data)); renderAll(); }
-function resetData() { if(confirm("TÜM VERİLER SİLİNECEK! Onaylıyor musun?")) { localStorage.removeItem('finansProFinal'); location.reload(); } }
 
 function exportData() {
     const a = document.createElement('a');
@@ -74,7 +143,8 @@ function importData(input) {
             const json = JSON.parse(e.target.result);
             if(json.loans && json.expenses) {
                 if(confirm("Mevcut veriler silinip yedek yüklenecek?")) {
-                    localStorage.setItem('finansProFinal', JSON.stringify(json));
+                    data = json;
+                    saveData(); // Hem yerele hem buluta yaz
                     location.reload();
                 }
             } else { alert("Hatalı dosya!"); }
@@ -83,7 +153,6 @@ function importData(input) {
     reader.readAsText(file);
 }
 
-// --- VIEW ---
 function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -96,7 +165,6 @@ function switchView(viewId) {
 }
 function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); }
 
-// --- DASHBOARD ---
 function renderDashboard() {
     const tbody = document.getElementById('dashboard-body');
     const year = document.getElementById('year-filter').value;
@@ -147,10 +215,7 @@ function updateChart(labels, inc, exp, year, isDark) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: {labels:{color:textColor}, position:'bottom'}, title: {display:true, text:`${year} Özeti`, color:textColor} },
-            scales: { 
-                y: { beginAtZero: true, ticks: { color:textColor, callback: v => v/1000 + 'k' }, grid:{color:isDark?'#444':'#eee'} },
-                x: { ticks: { color:textColor }, grid:{display:false} }
-            }
+            scales: { y: { beginAtZero: true, ticks: { color:textColor, callback: v => v/1000 + 'k' }, grid:{color:isDark?'#444':'#eee'} }, x: { ticks: { color:textColor }, grid:{display:false} } }
         }
     });
 }
@@ -164,10 +229,9 @@ function updateCurrentStatusCard() {
     data.loans.forEach(l => { if (isLoanActiveMonth(l.date, ym)) credit += (l.total/3); });
     document.getElementById('current-status-title').innerText = `${date.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})} DURUM`.toUpperCase();
     document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
-    document.getElementById('status-subtitle').innerText = "Bu ayki net denge";
+    // document.getElementById('status-subtitle').innerText = "Bu ayki net denge"; // Bu satırı kaldırdık, yerine syncStatus kullanıyoruz
 }
 
-// --- TRANSACTIONS ---
 function filterTransactions(type) {
     const list = document.getElementById('transaction-list');
     list.innerHTML = '';
@@ -200,7 +264,40 @@ function deleteItem(type, id) {
     saveData(); filterTransactions(type==='income'?'income':(type==='expense'?'expense':'all'));
 }
 
-// --- LOANS ---
+function renderRecurringList() {
+    const list = document.getElementById('recurring-list');
+    if(!list) return;
+    list.innerHTML = '';
+    if(data.recurring.length === 0) list.innerHTML = '<div style="color:var(--text-sec);font-size:12px;">Liste boş.</div>';
+    data.recurring.forEach((item, idx) => {
+        list.innerHTML += `
+        <div style="display:flex; justify-content:space-between; background:var(--bg-color); color:var(--text-main); padding:8px; margin-bottom:5px; border-radius:6px; align-items:center;">
+            <div><strong>${item.desc}</strong> <small>(${item.category})</small></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span>${formatMoney(item.amount)}</span>
+                <button onclick="deleteRecurring(${idx})" style="color:var(--red);border:none;background:none;"><i class="fas fa-times"></i></button>
+            </div>
+        </div>`;
+    });
+}
+function addRecurring() {
+    const desc = document.getElementById('rec-desc').value;
+    const cat = document.getElementById('rec-cat').value;
+    const amount = parseTrMoney(document.getElementById('rec-amount').value);
+    if(!desc || !amount) return alert("Eksik bilgi");
+    data.recurring.push({ desc, category: cat, amount });
+    saveData(); renderRecurringList();
+    document.getElementById('rec-desc').value = ''; document.getElementById('rec-amount').value = '';
+}
+function deleteRecurring(idx) { data.recurring.splice(idx, 1); saveData(); renderRecurringList(); }
+function processRecurring() {
+    if(data.recurring.length === 0) return alert("Listede sabit gider yok.");
+    if(!confirm("Bu ayın harcamalarına eklensin mi?")) return;
+    const today = new Date().toISOString().slice(0,10);
+    data.recurring.forEach(r => data.expenses.push({ id: Date.now()+Math.random(), date: today, desc: r.desc, category: r.category, amount: r.amount }));
+    saveData(); alert("Eklendi!"); closeModal();
+}
+
 function renderLoans() {
     const c = document.getElementById('loan-list-full'); c.innerHTML='';
     data.loans.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -216,7 +313,6 @@ function editLoan(id) {
     if(val) { l.total = parseTrMoney(val); saveData(); }
 }
 
-// --- MODAL & PDF ---
 let modalType = '';
 function openModal(type) {
     modalType = type;
@@ -229,6 +325,16 @@ function openModal(type) {
         form.innerHTML = `
             <label>Dönem Seçiniz</label><input type="month" id="pdf-month-select" value="${new Date().toISOString().slice(0,7)}">
             <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="generatePDF()"><i class="fas fa-file-pdf"></i> İndir</button>`;
+    } else if (type === 'recurring') {
+        title.innerText = "Sabit Giderler";
+        form.innerHTML = `
+            <div id="recurring-list" style="max-height:150px; overflow-y:auto; margin-bottom:15px;"></div>
+            <label>Yeni Ekle</label>
+            <div style="display:flex; gap:5px;"><input type="text" id="rec-desc" placeholder="Örn: Kira" style="flex:2"><select id="rec-cat" style="flex:1"><option>Kira</option><option>Fatura</option><option>Diğer</option></select></div>
+            <input type="text" id="rec-amount" placeholder="Tutar" inputmode="decimal">
+            <button type="button" class="btn btn-green" style="width:100%; margin-top:5px;" onclick="addRecurring()">Ekle</button>
+            <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="processRecurring()">Bu Ay İşle</button>`;
+        renderRecurringList();
     } else {
         const lbl = type==='income'?'Gelir':(type==='expense'?'Harcama':'Kredi');
         title.innerText = `${lbl} Ekle`;
@@ -246,7 +352,7 @@ function openModal(type) {
 }
 
 function submitForm() {
-    if (modalType === 'pdf') return;
+    if (modalType === 'pdf' || modalType === 'recurring') return;
     const date = document.getElementById('inp-date').value;
     const amount = parseTrMoney(document.getElementById('inp-amount').value);
     const desc = document.getElementById('inp-desc') ? document.getElementById('inp-desc').value : '';

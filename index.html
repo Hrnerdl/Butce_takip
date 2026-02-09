@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Finans Pro Ultimate</title>
+    <title>Finans Pro</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -16,35 +16,34 @@
     
     <aside class="sidebar">
         <header>
-            <h1><i class="fas fa-chart-line"></i> Finans Pro</h1>
-            <button class="theme-toggle" onclick="toggleTheme()">
-                <i class="fas fa-moon"></i>
+            <h1><i class="fas fa-wallet"></i> Finans Pro</h1>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Karanlık Mod">
+                <i class="fas fa-adjust"></i>
             </button>
         </header>
 
         <div class="balance-card">
             <span id="current-status-title">GENEL DURUM</span>
             <h2 id="grand-total">0,00 ₺</h2>
-            <small id="status-subtitle">Yükleniyor...</small>
+            <small id="status-subtitle">Hesaplanıyor...</small>
         </div>
 
-        <div class="nav-menu">
-            <button class="nav-btn active" onclick="switchView('dashboard')"><i class="fas fa-home"></i> Özet & Grafik</button>
-            <button class="nav-btn" onclick="switchView('transactions')"><i class="fas fa-list"></i> Hareketler</button>
+        <nav class="nav-menu">
+            <button class="nav-btn active" onclick="switchView('dashboard')"><i class="fas fa-chart-line"></i> Özet & Grafik</button>
+            <button class="nav-btn" onclick="switchView('transactions')"><i class="fas fa-list-ul"></i> Hareketler</button>
             <button class="nav-btn" onclick="switchView('loans')"><i class="fas fa-university"></i> Kredi Planı</button>
-            <button class="nav-btn" onclick="openModal('recurring')"><i class="fas fa-sync-alt"></i> Sabit Giderler</button>
-        </div>
+        </nav>
 
         <div class="action-buttons">
-            <button class="btn btn-green" onclick="openModal('income')"><i class="fas fa-plus"></i> Gelir</button>
-            <button class="btn btn-red" onclick="openModal('expense')"><i class="fas fa-minus"></i> Harcama</button>
+            <button class="btn btn-green" onclick="openModal('income')"><i class="fas fa-plus"></i> Gelir Ekle</button>
+            <button class="btn btn-red" onclick="openModal('expense')"><i class="fas fa-minus"></i> Harcama Ekle</button>
         </div>
 
         <div class="mini-settings">
-            <button onclick="openModal('pdf')" class="btn-text strong"><i class="fas fa-file-pdf"></i> Rapor</button>
+            <button onclick="openModal('pdf')" class="btn-text strong"><i class="fas fa-file-pdf"></i> Rapor Al</button>
             <div class="backup-controls">
-                <button onclick="exportData()" class="btn-icon" title="Yedekle"><i class="fas fa-download"></i></button>
-                <label for="import-file" class="btn-icon" title="Geri Yükle"><i class="fas fa-upload"></i></label>
+                <button onclick="exportData()" class="btn-icon" title="Yedek İndir"><i class="fas fa-download"></i></button>
+                <label for="import-file" class="btn-icon" title="Yedek Yükle"><i class="fas fa-upload"></i></label>
                 <input type="file" id="import-file" style="display:none" onchange="importData(this)">
                 <button onclick="resetData()" class="btn-icon danger" title="Sıfırla"><i class="fas fa-trash"></i></button>
             </div>
@@ -57,15 +56,17 @@
             <div class="table-header">
                 <h2>Finansal Genel Bakış</h2>
                 <select id="year-filter" onchange="renderDashboard()">
-                    <option value="2026">2026</option>
+                    <option value="2026" selected>2026</option>
                     <option value="2027">2027</option>
                     <option value="2028">2028</option>
                 </select>
             </div>
+
             <div class="chart-container-box">
                 <canvas id="financeChart"></canvas>
             </div>
-            <h3 class="section-sub-title">Aylık Nakit Akışı Tablosu</h3>
+            
+            <h3 class="section-sub-title">Aylık Nakit Akışı</h3>
             <div class="table-scroll-container">
                 <table class="dashboard-table">
                     <thead>
@@ -134,14 +135,14 @@
             <table class="pdf-table" id="pdf-table-inc"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
         </div>
         <div class="pdf-section">
-            <h3><i class="fas fa-university"></i> Kredi Planı (Bu Aya Düşen)</h3>
+            <h3><i class="fas fa-university"></i> Kredi Planı (Bu Ay)</h3>
             <table class="pdf-table" id="pdf-table-loan"><thead><tr><th>Taksit</th><th>Vade</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
         </div>
         <div class="pdf-section">
             <h3><i class="fas fa-arrow-up"></i> Harcama Detayları</h3>
             <table class="pdf-table" id="pdf-table-exp"><thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
         </div>
-        <div class="pdf-footer">Bu rapor Finans Pro Ultimate tarafından oluşturulmuştur.</div>
+        <div class="pdf-footer">Bu rapor Finans Pro tarafından oluşturulmuştur.</div>
     </div>
 </div>
 

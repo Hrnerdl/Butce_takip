@@ -6,6 +6,7 @@
     <title>Finans Pro</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
@@ -40,8 +41,13 @@
         </div>
 
         <div class="mini-settings">
-            <button onclick="exportData()" class="btn-text"><i class="fas fa-download"></i> Yedekle</button>
-            <button onclick="resetData()" class="btn-text text-danger"><i class="fas fa-trash"></i> Sıfırla</button>
+            <button onclick="openModal('pdf')" class="btn-text" style="color:#2c3e50; font-weight:bold;">
+                <i class="fas fa-file-pdf"></i> PDF Rapor Al
+            </button>
+            <div style="display:flex; gap:10px;">
+                <button onclick="exportData()" class="btn-text"><i class="fas fa-download"></i> Yedek</button>
+                <button onclick="resetData()" class="btn-text text-danger"><i class="fas fa-trash"></i></button>
+            </div>
         </div>
     </aside>
 
@@ -104,6 +110,62 @@
         </div>
         <div class="modal-body">
             <form id="active-form"></form>
+        </div>
+    </div>
+</div>
+
+<div id="pdf-template" style="display:none;">
+    <div class="pdf-container">
+        <div class="pdf-header">
+            <h1>FİNANSAL DURUM RAPORU</h1>
+            <p id="pdf-month-title">Dönem: --</p>
+        </div>
+        
+        <div class="pdf-summary">
+            <div class="p-box p-green">
+                <span>TOPLAM GELİR</span>
+                <h3 id="pdf-total-inc">0 ₺</h3>
+            </div>
+            <div class="p-box p-blue">
+                <span>KREDİ (AYRILAN)</span>
+                <h3 id="pdf-total-loan">0 ₺</h3>
+            </div>
+            <div class="p-box p-red">
+                <span>HARCAMALAR</span>
+                <h3 id="pdf-total-exp">0 ₺</h3>
+            </div>
+            <div class="p-box p-gray">
+                <span>KALAN NET</span>
+                <h3 id="pdf-net">0 ₺</h3>
+            </div>
+        </div>
+
+        <div class="pdf-section">
+            <h3><i class="fas fa-arrow-down"></i> Gelir Detayları</h3>
+            <table class="pdf-table" id="pdf-table-inc">
+                <thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="pdf-section">
+            <h3><i class="fas fa-university"></i> Kredi Planı (Bu Aya Düşen)</h3>
+            <table class="pdf-table" id="pdf-table-loan">
+                <thead><tr><th>Kredi/Taksit</th><th>Vade Tarihi</th><th class="tr">Bu Ay Ayrılan</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="pdf-section">
+            <h3><i class="fas fa-arrow-up"></i> Harcama Detayları</h3>
+            <table class="pdf-table" id="pdf-table-exp">
+                <thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="pdf-footer">
+            Bu rapor Finans Pro tarafından <span id="pdf-gen-date"></span> tarihinde oluşturulmuştur.
         </div>
     </div>
 </div>

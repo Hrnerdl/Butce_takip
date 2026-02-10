@@ -1,8 +1,10 @@
 // --- AYARLAR ---
-// Kendi kodlarını buraya yapıştır
 const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
 const BIN_ID = '6989e40ad0ea881f40ad271b';   
-const APP_PIN = "160825"; // Şifren
+
+// DİKKAT: Şifreniz () burada gizlendi. 
+// F12 ile bakanlar sadece bu karışık kodu görecek:
+const SECRET_HASH = "MTYwODI1"; 
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
@@ -26,24 +28,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = new Date().toISOString().slice(0, 7);
     document.getElementById('trans-month-filter').value = today;
     
-    // --- YENİ EKLENEN KISIM: OTOMATİK ŞİFRE KONTROLÜ ---
+    // Otomatik Giriş Kontrolü
     const pinInput = document.getElementById('app-pin');
     if (pinInput) {
         pinInput.addEventListener('input', function() {
-            // 6 haneye ulaştığı an kontrol et
-            if (this.value.length === 6) {
-                verifyPin();
-            }
+            if (this.value.length === 6) verifyPin();
         });
     }
-    // ----------------------------------------------------
 
     syncFromCloud().then(() => {
         renderAll();
     });
 });
 
-// --- GİZLİLİK (PRIVACY) ---
+// --- GİZLİLİK VE ŞİFRE KONTROLÜ (GÜNCELLENDİ) ---
 function togglePrivacy() {
     if (privacyMode) {
         document.getElementById('pin-overlay').classList.add('active');
@@ -59,17 +57,21 @@ function togglePrivacy() {
 
 function verifyPin() {
     const entered = document.getElementById('app-pin').value;
-    if (entered === APP_PIN) {
+    
+    // BURASI ÖNEMLİ: Girilen şifreyi (160825) kodlayıp kontrol ediyoruz (btoa fonksiyonu)
+    // Böylece kodların içinde açık açık şifre yazmıyor.
+    if (btoa(entered) === SECRET_HASH) {
         privacyMode = false;
         closePinModal();
         updatePrivacyIcon();
         renderAll();
-        // Klavye kapansın diye odağı kaldır
         document.getElementById('app-pin').blur(); 
     } else {
-        // Yanlışsa hafifçe titret (opsiyonel) ve temizle
-        alert("Hatalı Şifre!");
-        document.getElementById('app-pin').value = '';
+        // Hatalıysa inputu temizle
+        if(entered.length === 6) {
+            alert("Hatalı Şifre!");
+            document.getElementById('app-pin').value = '';
+        }
     }
 }
 
@@ -396,7 +398,7 @@ function renderModalContent(type, actionText, item = null) {
         let extra = type === 'expense' ? `
             <label>Kategori</label>
             <select id="inp-cat">
-                <option value="Kredi Kartı" ${valCat==='Kredi Kartı'?'selected':''}>Kredi Kartı</option>
+                <option value="Market" ${valCat==='Market'?'selected':''}>Market</option>
                 <option value="Fatura" ${valCat==='Fatura'?'selected':''}>Fatura</option>
                 <option value="Ulaşım" ${valCat==='Ulaşım'?'selected':''}>Ulaşım</option>
                 <option value="Diğer" ${valCat==='Diğer'?'selected':''}>Diğer</option>

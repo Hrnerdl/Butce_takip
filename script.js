@@ -1,22 +1,25 @@
 // --- AYARLAR ---
+// Lütfen buraya kendi JSONBin kodlarını tekrar yapıştır
 const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
 const BIN_ID = '6989e40ad0ea881f40ad271b';   
+const APP_PIN = "160825"; // Sabit Şifre
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
 let myChart = null;
-let currentTransFilter = 'all'; // Mevcut filtre (all, income, expense)
+let currentTransFilter = 'all'; 
+let privacyMode = true; // Başlangıçta gizli
 
-// Hazır Krediler (GÜNCELLENDİ: Excel verisi birebir işlendi)
+// Hazır Krediler (Excel verilerine göre güncellendi)
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
     { id: 102, no: 2, date: '2026-08-06', total: 146388.89 },
     { id: 103, no: 3, date: '2026-11-06', total: 140958.33 },
     { id: 104, no: 4, date: '2027-02-06', total: 136118.06 },
-    { id: 105, no: 5, date: '2027-05-06', total: 129447.92 }, // Excel'den güncellendi
-    { id: 106, no: 6, date: '2027-08-06', total: 125197.92 }, // Excel'den güncellendi
-    { id: 107, no: 7, date: '2027-11-08', total: 120003.47 }, // Excel'den güncellendi (Tarih ve Tutar)
-    { id: 108, no: 8, date: '2028-02-07', total: 114277.78 }  // Excel'den güncellendi (Tarih ve Tutar)
+    { id: 105, no: 5, date: '2027-05-06', total: 129447.92 }, // Excelden güncellendi
+    { id: 106, no: 6, date: '2027-08-06', total: 125197.92 }, // Excelden güncellendi
+    { id: 107, no: 7, date: '2027-11-08', total: 120003.47 }, // Excelden güncellendi
+    { id: 108, no: 8, date: '2028-02-07', total: 114277.78 }  // Excelden güncellendi
 ];
 
 document.addEventListener('DOMContentLoaded', () => { 
@@ -30,9 +33,58 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// --- BULUT SENKRONİZASYONU ---
+// --- GİZLİLİK (PRIVACY) ---
+function togglePrivacy() {
+    if (privacyMode) {
+        // Eğer gizliyse, şifre sor
+        document.getElementById('pin-overlay').classList.add('active');
+        document.getElementById('app-pin').value = '';
+        document.getElementById('app-pin').focus();
+    } else {
+        // Açıksa, direkt gizle
+        privacyMode = true;
+        updatePrivacyIcon();
+        renderAll();
+    }
+}
+
+function verifyPin() {
+    const entered = document.getElementById('app-pin').value;
+    if (entered === APP_PIN) {
+        privacyMode = false;
+        closePinModal();
+        updatePrivacyIcon();
+        renderAll();
+    } else {
+        alert("Hatalı Şifre!");
+        document.getElementById('app-pin').value = '';
+    }
+}
+
+function closePinModal() {
+    document.getElementById('pin-overlay').classList.remove('active');
+}
+
+function updatePrivacyIcon() {
+    const icon = document.getElementById('privacy-icon');
+    if (privacyMode) {
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// Para Formatlama (Gizlilik Kontrollü)
+function formatMoney(n) {
+    if (privacyMode) return '**** ₺';
+    return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+}
+
+// --- BULUT ---
 async function syncFromCloud() {
-    updateStatusText("Buluta Bağlanıyor...", "orange");
+    updateStatusText("Bağlanıyor...", "orange");
     try {
         const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             method: 'GET',
@@ -44,7 +96,7 @@ async function syncFromCloud() {
             if(json.record && (json.record.loans || json.record.incomes)) {
                 data = json.record;
                 localStorage.setItem('finansProFinal', JSON.stringify(data));
-                updateStatusText("Bulut ile Eşleşti ✅", "green");
+                updateStatusText("Bulut Aktif ✅", "green");
             } else {
                 initializeData();
                 saveData(); 
@@ -54,7 +106,7 @@ async function syncFromCloud() {
         }
     } catch (error) {
         console.error("Bulut Hatası:", error);
-        updateStatusText("İnternet Yok - Yerel Mod ⚠️", "red");
+        updateStatusText("Yerel Mod ⚠️", "red");
         const stored = localStorage.getItem('finansProFinal');
         if (stored) data = JSON.parse(stored);
         else initializeData();
@@ -65,7 +117,7 @@ async function saveData() {
     localStorage.setItem('finansProFinal', JSON.stringify(data));
     renderAll();
 
-    updateStatusText("Buluta Kaydediliyor...", "orange");
+    updateStatusText("Kaydediliyor...", "orange");
     try {
         const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
             method: 'PUT',
@@ -77,9 +129,9 @@ async function saveData() {
         });
 
         if(response.ok) updateStatusText("Güvende ✅", "green");
-        else updateStatusText("Bulut Kayıt Hatası ⚠️", "red");
+        else updateStatusText("Bulut Hatası ⚠️", "red");
     } catch (e) {
-        updateStatusText("İnternet Yok - Kuyrukta ⚠️", "red");
+        updateStatusText("İnternet Yok ⚠️", "red");
     }
 }
 
@@ -114,7 +166,7 @@ function toggleTheme() {
 }
 function loadTheme() { if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); }
 
-// --- DİĞER İŞLEMLER ---
+// --- RESET/EXPORT/IMPORT ---
 function resetData() { 
     if(confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) { 
         localStorage.removeItem('finansProFinal'); 
@@ -140,7 +192,7 @@ function importData(input) {
         try {
             const json = JSON.parse(e.target.result);
             if(json.loans && json.expenses) {
-                if(confirm("Mevcut veriler silinip yedek yüklenecek?")) {
+                if(confirm("Yedek yüklenecek, onaylıyor musun?")) {
                     data = json;
                     saveData();
                     location.reload();
@@ -151,6 +203,7 @@ function importData(input) {
     reader.readAsText(file);
 }
 
+// --- GÖRÜNÜM ---
 function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -160,13 +213,13 @@ function switchView(viewId) {
     if(viewId==='dashboard') navs[0].classList.add('active');
     if(viewId==='transactions') { 
         navs[1].classList.add('active'); 
-        // Filtreyi sıfırlamıyoruz, son kaldığı yerden devam ediyor
         renderTransactions(); 
     }
     if(viewId==='loans') navs[2].classList.add('active');
 }
 function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); renderTransactions(); }
 
+// --- DASHBOARD ---
 function renderDashboard() {
     const tbody = document.getElementById('dashboard-body');
     const year = document.getElementById('year-filter').value;
@@ -233,7 +286,7 @@ function updateCurrentStatusCard() {
     document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
 }
 
-// --- TRANSACTIONS (Filtreleme, Düzenleme, Silme) ---
+// --- HAREKETLER (Transactions) ---
 function setTransFilter(type) {
     currentTransFilter = type;
     document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
@@ -250,7 +303,7 @@ function renderTransactions() {
     if(currentTransFilter !== 'expense') data.incomes.forEach(i => items.push({...i, type:'income'}));
     if(currentTransFilter !== 'income') data.expenses.forEach(e => items.push({...e, type:'expense'}));
     
-    // Tarihe göre filtrele
+    // Tarih Filtresi
     if (dateFilter) {
         items = items.filter(item => item.date.startsWith(dateFilter));
     }
@@ -265,11 +318,16 @@ function renderTransactions() {
     items.forEach(item => {
         const isInc = item.type==='income';
         const catBadge = item.category ? `<span class="cat-badge">${item.category}</span>` : '';
+        // Para miktarı formatMoney ile gizlenir
+        const amountDisplay = formatMoney(item.amount); 
+        
         list.innerHTML += `
         <div class="trans-item" style="border-left:4px solid ${isInc?'var(--green)':'var(--red)'}">
             <div class="trans-left"><h4>${catBadge}${item.desc}</h4><p>${formatDateTR(item.date)}</p></div>
             <div class="trans-right">
-                <span class="trans-amt" style="color:${isInc?'var(--green)':'var(--red)'}">${isInc?'+':'-'}${formatMoney(item.amount)}</span>
+                <span class="trans-amt" style="color:${isInc?'var(--green)':'var(--red)'}">
+                    ${isInc?'+':'-'}${amountDisplay}
+                </span>
                 <div class="trans-actions">
                     <button class="edit" onclick="openEditTransaction('${item.type}', ${item.id})"><i class="fas fa-edit"></i></button>
                     <button class="del" onclick="deleteItem('${item.type}', ${item.id})"><i class="fas fa-trash"></i></button>
@@ -284,10 +342,10 @@ function deleteItem(type, id) {
     if(type==='income') data.incomes = data.incomes.filter(i=>i.id!==id);
     else data.expenses = data.expenses.filter(e=>e.id!==id);
     saveData(); 
-    // Filtreyi değiştirmeden render et (HATA DÜZELTİLDİ)
-    renderTransactions(); 
+    renderTransactions(); // Filtreyi bozmadan yenile
 }
 
+// --- KREDİLER ---
 function renderLoans() {
     const c = document.getElementById('loan-list-full'); c.innerHTML='';
     data.loans.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -322,7 +380,6 @@ function openEditTransaction(type, id) {
     editId = id;
     document.getElementById('modal-overlay').classList.add('active');
     
-    // Mevcut veriyi bul
     let item;
     if(type === 'income') item = data.incomes.find(i => i.id === id);
     else item = data.expenses.find(e => e.id === id);
@@ -385,7 +442,7 @@ function submitForm() {
         const list = modalType==='income' ? data.incomes : data.expenses;
         
         if (editMode && editId) {
-            // Düzenleme Modu
+            // Düzenleme
             const existingItem = list.find(i => i.id === editId);
             if (existingItem) {
                 existingItem.date = date;
@@ -394,17 +451,16 @@ function submitForm() {
                 if(modalType==='expense') existingItem.category = cat;
             }
         } else {
-            // Yeni Ekleme Modu
+            // Yeni Ekleme
             list.push({id:Date.now(), date, desc, category: cat, amount});
         }
-        
-        // Sadece listeyi yenile, filtreyi bozma
-        renderTransactions(); 
+        renderTransactions(); // Filtreyi bozmadan yenile
     }
     saveData(); closeModal();
 }
 
 function generatePDF() {
+    // Gizlilik modundaysa PDF'te de gizli çıkar, o yüzden önce şifre sorulabilir ama şimdilik doğrudan basıyoruz
     const ym = document.getElementById('pdf-month-select').value;
     if(!ym) return alert("Ay seçiniz");
     const [y, m] = ym.split('-');
@@ -416,19 +472,24 @@ function generatePDF() {
     const totExp = exps.reduce((s,e)=>s+e.amount,0);
 
     document.getElementById('pdf-month-title').innerText = `Dönem: ${getMonthName(m)} ${y}`;
-    document.getElementById('pdf-total-inc').innerText = formatMoney(totInc);
-    document.getElementById('pdf-total-loan').innerText = formatMoney(lTotal);
-    document.getElementById('pdf-total-exp').innerText = formatMoney(totExp);
-    document.getElementById('pdf-net').innerText = formatMoney(totInc - lTotal - totExp);
+    document.getElementById('pdf-date').innerText = new Date().toLocaleDateString('tr-TR');
+    // PDF'te paralar GÖRÜNSÜN istiyorsak privacyMode'u geçici kapatıp geri açabiliriz veya formatMoney kullanmayız.
+    // Şimdilik PDF özel rapor olduğu için rakamları AÇIK gösterelim:
+    const fmt = n => n.toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ₺';
+
+    document.getElementById('pdf-total-inc').innerText = fmt(totInc);
+    document.getElementById('pdf-total-loan').innerText = fmt(lTotal);
+    document.getElementById('pdf-total-exp').innerText = fmt(totExp);
+    document.getElementById('pdf-net').innerText = fmt(totInc - lTotal - totExp);
 
     const fill = (id, arr, c1, c2, c3, c4=null) => {
         const tb = document.querySelector(`#${id} tbody`); tb.innerHTML='';
         if(arr.length===0) tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:#999">Kayıt Yok</td></tr>';
         arr.forEach(x => tb.innerHTML += `<tr><td>${c1(x)}</td><td>${c2(x)}</td>${c4?`<td>${c4(x)}</td>`:''} <td class="tr">${c3(x)}</td></tr>`);
     };
-    fill('pdf-table-inc', incs, i=>formatDateTR(i.date), i=>i.desc, i=>formatMoney(i.amount));
-    fill('pdf-table-loan', loans, l=>`Taksit #${l.no}`, l=>formatDateTR(l.date), l=>formatMoney(l.val));
-    fill('pdf-table-exp', exps, e=>formatDateTR(e.date), e=>e.category||'-', e=>formatMoney(e.amount), e=>e.desc);
+    fill('pdf-table-inc', incs, i=>formatDateTR(i.date), i=>i.desc, i=>fmt(i.amount));
+    fill('pdf-table-loan', loans, l=>`Taksit #${l.no}`, l=>formatDateTR(l.date), l=>fmt(l.val));
+    fill('pdf-table-exp', exps, e=>formatDateTR(e.date), e=>e.category||'-', e=>fmt(e.amount), e=>e.desc);
 
     const el = document.getElementById('pdf-template');
     el.style.display = 'block';
@@ -437,8 +498,6 @@ function generatePDF() {
 
 function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
 function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').replace(/\./g,'').replace(',','.')); }
-function formatMoney(n) { return n.toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ₺'; }
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
-

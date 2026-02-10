@@ -1,35 +1,38 @@
-// --- AYARLAR (BURAYI DOLDURMAN ŞART) ---
-const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; // JSONBin'den aldığın Master Key (X-Master-Key)
-const BIN_ID = '6989e40ad0ea881f40ad271b';   // JSONBin'den aldığın Bin ID
+// --- AYARLAR ---
+const API_KEY = 'BURAYA_MASTER_KEY_YAPISTIR'; 
+const BIN_ID = 'BURAYA_BIN_ID_YAPISTIR';   
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
 let myChart = null;
-let isOffline = false; // İnternet yoksa çalışmaya devam etmesi için
+let currentTransFilter = 'all'; // Mevcut filtre (all, income, expense)
 
-// Hazır Krediler
+// Hazır Krediler (GÜNCELLENDİ: Excel verisi birebir işlendi)
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
     { id: 102, no: 2, date: '2026-08-06', total: 146388.89 },
     { id: 103, no: 3, date: '2026-11-06', total: 140958.33 },
     { id: 104, no: 4, date: '2027-02-06', total: 136118.06 },
-    { id: 105, no: 5, date: '2027-05-06', total: 129447.92 },
-    { id: 106, no: 6, date: '2027-08-06', total: 124409.72 },
-    { id: 107, no: 7, date: '2027-11-06', total: 120000.00 },
-    { id: 108, no: 8, date: '2028-02-06', total: 115000.00 }
+    { id: 105, no: 5, date: '2027-05-06', total: 129447.92 }, // Excel'den güncellendi
+    { id: 106, no: 6, date: '2027-08-06', total: 125197.92 }, // Excel'den güncellendi
+    { id: 107, no: 7, date: '2027-11-08', total: 120003.47 }, // Excel'den güncellendi (Tarih ve Tutar)
+    { id: 108, no: 8, date: '2028-02-07', total: 114277.78 }  // Excel'den güncellendi (Tarih ve Tutar)
 ];
 
 document.addEventListener('DOMContentLoaded', () => { 
     loadTheme();
-    // Önce buluttan çekmeye çalış, olmazsa yerelden yükle
+    // Varsayılan tarih filtresini bugünün ayı yap
+    const today = new Date().toISOString().slice(0, 7);
+    document.getElementById('trans-month-filter').value = today;
+    
     syncFromCloud().then(() => {
         renderAll();
     });
 });
 
-// --- BULUT SENKRONİZASYONU (EN ÖNEMLİ KISIM) ---
+// --- BULUT SENKRONİZASYONU ---
 async function syncFromCloud() {
-    updateStatusText("Veriler indiriliyor...", "orange");
+    updateStatusText("Buluta Bağlanıyor...", "orange");
     try {
         const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             method: 'GET',
@@ -38,13 +41,11 @@ async function syncFromCloud() {
         
         if (response.ok) {
             const json = await response.json();
-            // Bulut boşsa veya hata varsa yerel veriyi koru
             if(json.record && (json.record.loans || json.record.incomes)) {
                 data = json.record;
-                localStorage.setItem('finansProFinal', JSON.stringify(data)); // Yerele de yedekle
+                localStorage.setItem('finansProFinal', JSON.stringify(data));
                 updateStatusText("Bulut ile Eşleşti ✅", "green");
             } else {
-                // Bulut boşsa ilk kurulumu yap
                 initializeData();
                 saveData(); 
             }
@@ -54,8 +55,6 @@ async function syncFromCloud() {
     } catch (error) {
         console.error("Bulut Hatası:", error);
         updateStatusText("İnternet Yok - Yerel Mod ⚠️", "red");
-        isOffline = true;
-        // İnternet yoksa yerelden oku
         const stored = localStorage.getItem('finansProFinal');
         if (stored) data = JSON.parse(stored);
         else initializeData();
@@ -63,13 +62,10 @@ async function syncFromCloud() {
 }
 
 async function saveData() {
-    // 1. Önce telefon hafızasına kaydet (Hız için)
     localStorage.setItem('finansProFinal', JSON.stringify(data));
     renderAll();
 
-    // 2. Sonra buluta gönder (Yedekleme için)
     updateStatusText("Buluta Kaydediliyor...", "orange");
-    
     try {
         const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
             method: 'PUT',
@@ -80,18 +76,14 @@ async function saveData() {
             body: JSON.stringify(data)
         });
 
-        if(response.ok) {
-            updateStatusText("Güvende ✅", "green");
-        } else {
-            updateStatusText("Bulut Kayıt Hatası ⚠️", "red");
-        }
+        if(response.ok) updateStatusText("Güvende ✅", "green");
+        else updateStatusText("Bulut Kayıt Hatası ⚠️", "red");
     } catch (e) {
         updateStatusText("İnternet Yok - Kuyrukta ⚠️", "red");
     }
 }
 
 function updateStatusText(msg, color) {
-    // Sol menüdeki "Yükleniyor..." yazısını durum çubuğu yapıyoruz
     const el = document.getElementById('status-subtitle');
     if(el) {
         el.innerText = msg;
@@ -104,7 +96,13 @@ function initializeData() {
     data.loans = [...PRELOADED_LOANS];
     for(let m = 2; m <= 12; m++) {
         let monthStr = m < 10 ? '0' + m : m;
-        data.incomes.push({ id: Date.now() + m, date: `2026-${monthStr}-15`, desc: 'Maaş', category: 'Maaş', amount: 67000 });
+        data.incomes.push({ 
+            id: Date.now() + m, 
+            date: `2026-${monthStr}-15`, 
+            desc: 'Maaş', 
+            category: 'Maaş', 
+            amount: 67000 
+        });
     }
 }
 
@@ -116,13 +114,13 @@ function toggleTheme() {
 }
 function loadTheme() { if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); }
 
-// --- DİĞER FONKSİYONLAR (STANDART) ---
+// --- DİĞER İŞLEMLER ---
 function resetData() { 
     if(confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) { 
         localStorage.removeItem('finansProFinal'); 
         data = { loans: [], expenses: [], incomes: [], recurring: [] };
         initializeData();
-        saveData(); // Bulutu da sıfırla
+        saveData();
         location.reload(); 
     } 
 }
@@ -144,7 +142,7 @@ function importData(input) {
             if(json.loans && json.expenses) {
                 if(confirm("Mevcut veriler silinip yedek yüklenecek?")) {
                     data = json;
-                    saveData(); // Hem yerele hem buluta yaz
+                    saveData();
                     location.reload();
                 }
             } else { alert("Hatalı dosya!"); }
@@ -160,10 +158,14 @@ function switchView(viewId) {
     
     const navs = document.querySelectorAll('.nav-btn');
     if(viewId==='dashboard') navs[0].classList.add('active');
-    if(viewId==='transactions') { navs[1].classList.add('active'); filterTransactions('all'); }
+    if(viewId==='transactions') { 
+        navs[1].classList.add('active'); 
+        // Filtreyi sıfırlamıyoruz, son kaldığı yerden devam ediyor
+        renderTransactions(); 
+    }
     if(viewId==='loans') navs[2].classList.add('active');
 }
-function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); }
+function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); renderTransactions(); }
 
 function renderDashboard() {
     const tbody = document.getElementById('dashboard-body');
@@ -229,21 +231,37 @@ function updateCurrentStatusCard() {
     data.loans.forEach(l => { if (isLoanActiveMonth(l.date, ym)) credit += (l.total/3); });
     document.getElementById('current-status-title').innerText = `${date.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})} DURUM`.toUpperCase();
     document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
-    // document.getElementById('status-subtitle').innerText = "Bu ayki net denge"; // Bu satırı kaldırdık, yerine syncStatus kullanıyoruz
 }
 
-function filterTransactions(type) {
-    const list = document.getElementById('transaction-list');
-    list.innerHTML = '';
+// --- TRANSACTIONS (Filtreleme, Düzenleme, Silme) ---
+function setTransFilter(type) {
+    currentTransFilter = type;
     document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
+    renderTransactions();
+}
+
+function renderTransactions() {
+    const list = document.getElementById('transaction-list');
+    list.innerHTML = '';
+    const dateFilter = document.getElementById('trans-month-filter').value; // YYYY-MM
     
     let items = [];
-    if(type!=='expense') data.incomes.forEach(i => items.push({...i, type:'income'}));
-    if(type!=='income') data.expenses.forEach(e => items.push({...e, type:'expense'}));
+    if(currentTransFilter !== 'expense') data.incomes.forEach(i => items.push({...i, type:'income'}));
+    if(currentTransFilter !== 'income') data.expenses.forEach(e => items.push({...e, type:'expense'}));
+    
+    // Tarihe göre filtrele
+    if (dateFilter) {
+        items = items.filter(item => item.date.startsWith(dateFilter));
+    }
+    
     items.sort((a,b)=>new Date(b.date)-new Date(a.date));
     
-    if(items.length===0) list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-sec)">Kayıt Yok</div>';
+    if(items.length===0) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-sec)">Kayıt Yok</div>';
+        return;
+    }
+    
     items.forEach(item => {
         const isInc = item.type==='income';
         const catBadge = item.category ? `<span class="cat-badge">${item.category}</span>` : '';
@@ -252,50 +270,22 @@ function filterTransactions(type) {
             <div class="trans-left"><h4>${catBadge}${item.desc}</h4><p>${formatDateTR(item.date)}</p></div>
             <div class="trans-right">
                 <span class="trans-amt" style="color:${isInc?'var(--green)':'var(--red)'}">${isInc?'+':'-'}${formatMoney(item.amount)}</span>
-                <div class="trans-actions"><button onclick="deleteItem('${item.type}', ${item.id})"><i class="fas fa-trash"></i></button></div>
+                <div class="trans-actions">
+                    <button class="edit" onclick="openEditTransaction('${item.type}', ${item.id})"><i class="fas fa-edit"></i></button>
+                    <button class="del" onclick="deleteItem('${item.type}', ${item.id})"><i class="fas fa-trash"></i></button>
+                </div>
             </div>
         </div>`;
     });
 }
+
 function deleteItem(type, id) {
     if(!confirm("Silinsin mi?")) return;
     if(type==='income') data.incomes = data.incomes.filter(i=>i.id!==id);
     else data.expenses = data.expenses.filter(e=>e.id!==id);
-    saveData(); filterTransactions(type==='income'?'income':(type==='expense'?'expense':'all'));
-}
-
-function renderRecurringList() {
-    const list = document.getElementById('recurring-list');
-    if(!list) return;
-    list.innerHTML = '';
-    if(data.recurring.length === 0) list.innerHTML = '<div style="color:var(--text-sec);font-size:12px;">Liste boş.</div>';
-    data.recurring.forEach((item, idx) => {
-        list.innerHTML += `
-        <div style="display:flex; justify-content:space-between; background:var(--bg-color); color:var(--text-main); padding:8px; margin-bottom:5px; border-radius:6px; align-items:center;">
-            <div><strong>${item.desc}</strong> <small>(${item.category})</small></div>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span>${formatMoney(item.amount)}</span>
-                <button onclick="deleteRecurring(${idx})" style="color:var(--red);border:none;background:none;"><i class="fas fa-times"></i></button>
-            </div>
-        </div>`;
-    });
-}
-function addRecurring() {
-    const desc = document.getElementById('rec-desc').value;
-    const cat = document.getElementById('rec-cat').value;
-    const amount = parseTrMoney(document.getElementById('rec-amount').value);
-    if(!desc || !amount) return alert("Eksik bilgi");
-    data.recurring.push({ desc, category: cat, amount });
-    saveData(); renderRecurringList();
-    document.getElementById('rec-desc').value = ''; document.getElementById('rec-amount').value = '';
-}
-function deleteRecurring(idx) { data.recurring.splice(idx, 1); saveData(); renderRecurringList(); }
-function processRecurring() {
-    if(data.recurring.length === 0) return alert("Listede sabit gider yok.");
-    if(!confirm("Bu ayın harcamalarına eklensin mi?")) return;
-    const today = new Date().toISOString().slice(0,10);
-    data.recurring.forEach(r => data.expenses.push({ id: Date.now()+Math.random(), date: today, desc: r.desc, category: r.category, amount: r.amount }));
-    saveData(); alert("Eklendi!"); closeModal();
+    saveData(); 
+    // Filtreyi değiştirmeden render et (HATA DÜZELTİLDİ)
+    renderTransactions(); 
 }
 
 function renderLoans() {
@@ -313,59 +303,103 @@ function editLoan(id) {
     if(val) { l.total = parseTrMoney(val); saveData(); }
 }
 
+// --- MODAL & DÜZENLEME ---
 let modalType = '';
+let editMode = false;
+let editId = null;
+
 function openModal(type) {
     modalType = type;
+    editMode = false;
+    editId = null;
     document.getElementById('modal-overlay').classList.add('active');
+    renderModalContent(type, "Ekle");
+}
+
+function openEditTransaction(type, id) {
+    modalType = type;
+    editMode = true;
+    editId = id;
+    document.getElementById('modal-overlay').classList.add('active');
+    
+    // Mevcut veriyi bul
+    let item;
+    if(type === 'income') item = data.incomes.find(i => i.id === id);
+    else item = data.expenses.find(e => e.id === id);
+    
+    renderModalContent(type, "Düzenle", item);
+}
+
+function renderModalContent(type, actionText, item = null) {
     const title = document.getElementById('modal-title');
     const form = document.getElementById('active-form');
+    const today = new Date().toISOString().split('T')[0];
     
     if (type === 'pdf') {
         title.innerText = "PDF Raporu";
         form.innerHTML = `
             <label>Dönem Seçiniz</label><input type="month" id="pdf-month-select" value="${new Date().toISOString().slice(0,7)}">
             <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="generatePDF()"><i class="fas fa-file-pdf"></i> İndir</button>`;
-    } else if (type === 'recurring') {
-        title.innerText = "Sabit Giderler";
-        form.innerHTML = `
-            <div id="recurring-list" style="max-height:150px; overflow-y:auto; margin-bottom:15px;"></div>
-            <label>Yeni Ekle</label>
-            <div style="display:flex; gap:5px;"><input type="text" id="rec-desc" placeholder="Örn: Kira" style="flex:2"><select id="rec-cat" style="flex:1"><option>Kira</option><option>Fatura</option><option>Diğer</option></select></div>
-            <input type="text" id="rec-amount" placeholder="Tutar" inputmode="decimal">
-            <button type="button" class="btn btn-green" style="width:100%; margin-top:5px;" onclick="addRecurring()">Ekle</button>
-            <button type="button" class="btn btn-blue" style="width:100%; margin-top:15px;" onclick="processRecurring()">Bu Ay İşle</button>`;
-        renderRecurringList();
     } else {
         const lbl = type==='income'?'Gelir':(type==='expense'?'Harcama':'Kredi');
-        title.innerText = `${lbl} Ekle`;
-        const today = new Date().toISOString().split('T')[0];
-        let extra = type === 'expense' ? `<label>Kategori</label><select id="inp-cat"><option value="Market">Market</option><option value="Fatura">Fatura</option><option value="Ulaşım">Ulaşım</option><option value="Diğer">Diğer</option></select>` : (type === 'loan' ? `<label>Taksit No</label><input type="number" id="inp-no">` : '');
+        title.innerText = `${lbl} ${actionText}`;
+        
+        let valDate = item ? item.date : today;
+        let valDesc = item ? item.desc : (type==='income'?'Maaş':'');
+        let valAmt = item ? item.amount.toLocaleString('tr-TR',{minimumFractionDigits:2}) : '';
+        let valCat = item ? item.category : '';
+        let valLoanNo = type==='loan' && item ? item.no : '';
+
+        let extra = type === 'expense' ? `
+            <label>Kategori</label>
+            <select id="inp-cat">
+                <option value="Market" ${valCat==='Market'?'selected':''}>Market</option>
+                <option value="Fatura" ${valCat==='Fatura'?'selected':''}>Fatura</option>
+                <option value="Ulaşım" ${valCat==='Ulaşım'?'selected':''}>Ulaşım</option>
+                <option value="Diğer" ${valCat==='Diğer'?'selected':''}>Diğer</option>
+            </select>` : (type === 'loan' ? `<label>Taksit No</label><input type="number" id="inp-no" value="${valLoanNo}">` : '');
         
         form.innerHTML = `
-            ${type!=='loan' ? `<label>Tarih</label><input type="date" id="inp-date" value="${today}">` : ''}
-            ${type==='loan' ? `<label>Vade Tarihi</label><input type="date" id="inp-date" value="${today}">` : ''}
+            ${type!=='loan' ? `<label>Tarih</label><input type="date" id="inp-date" value="${valDate}">` : ''}
+            ${type==='loan' ? `<label>Vade Tarihi</label><input type="date" id="inp-date" value="${valDate}">` : ''}
             ${extra}
-            ${type!=='loan' ? `<label>Açıklama</label><input type="text" id="inp-desc" value="${type==='income'?'Maaş':''}">` : ''}
-            <label>Tutar</label><input type="text" id="inp-amount" inputmode="decimal">
+            ${type!=='loan' ? `<label>Açıklama</label><input type="text" id="inp-desc" value="${valDesc}">` : ''}
+            <label>Tutar</label><input type="text" id="inp-amount" inputmode="decimal" value="${valAmt}">
             <button type="button" class="btn ${type==='income'?'btn-green':(type==='expense'?'btn-red':'btn-blue')}" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>`;
     }
 }
 
 function submitForm() {
-    if (modalType === 'pdf' || modalType === 'recurring') return;
+    if (modalType === 'pdf') return;
     const date = document.getElementById('inp-date').value;
     const amount = parseTrMoney(document.getElementById('inp-amount').value);
     const desc = document.getElementById('inp-desc') ? document.getElementById('inp-desc').value : '';
     const cat = document.getElementById('inp-cat') ? document.getElementById('inp-cat').value : '';
     
     if(!date || isNaN(amount)) return alert("Eksik bilgi!");
+    
     if(modalType === 'loan') {
         data.loans.push({id:Date.now(), no:document.getElementById('inp-no').value, date, total:amount});
         switchView('loans');
     } else {
         const list = modalType==='income' ? data.incomes : data.expenses;
-        list.push({id:Date.now(), date, desc, category: cat, amount});
-        filterTransactions(modalType);
+        
+        if (editMode && editId) {
+            // Düzenleme Modu
+            const existingItem = list.find(i => i.id === editId);
+            if (existingItem) {
+                existingItem.date = date;
+                existingItem.desc = desc;
+                existingItem.amount = amount;
+                if(modalType==='expense') existingItem.category = cat;
+            }
+        } else {
+            // Yeni Ekleme Modu
+            list.push({id:Date.now(), date, desc, category: cat, amount});
+        }
+        
+        // Sadece listeyi yenile, filtreyi bozma
+        renderTransactions(); 
     }
     saveData(); closeModal();
 }
@@ -407,5 +441,3 @@ function formatMoney(n) { return n.toLocaleString('tr-TR',{minimumFractionDigits
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
-
-

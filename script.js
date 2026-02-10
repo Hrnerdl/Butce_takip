@@ -1,6 +1,6 @@
 // --- AYARLAR ---
-const API_KEY = 'BURAYA_MASTER_KEY_YAPISTIR'; 
-const BIN_ID = 'BURAYA_BIN_ID_YAPISTIR';   
+const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
+const BIN_ID = '6989e40ad0ea881f40ad271b';   
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
@@ -441,3 +441,4 @@ function formatMoney(n) { return n.toLocaleString('tr-TR',{minimumFractionDigits
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
+

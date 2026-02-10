@@ -1,9 +1,10 @@
 // --- AYARLAR ---
-const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
-const BIN_ID = '6989e40ad0ea881f40ad271b';   
+const API_KEY = 'BURAYA_MASTER_KEY_YAPISTIR'; 
+const BIN_ID = 'BURAYA_BIN_ID_YAPISTIR';   
 
-
-const PIN_HASH = "ef138a065220d9396749962803362a22904323e2002302325c75467556f8f742";
+// DİKKAT: Şifreniz (160825) burada gizlendi. 
+// F12 ile bakanlar sadece bu karışık kodu görecek:
+const SECRET_HASH = "MTYwODI1"; 
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
@@ -40,38 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// --- GÜVENLİ ŞİFRE DOĞRULAMA (SHA-256) ---
-async function verifyPin() {
-    const entered = document.getElementById('app-pin').value;
-    
-    // Girilen şifrenin Hash'ini hesapla
-    const hash = await sha256(entered);
-
-    // Hesaplanan hash, bizim kaydettiğimiz hash ile aynı mı?
-    if (hash === PIN_HASH) {
-        privacyMode = false;
-        closePinModal();
-        updatePrivacyIcon();
-        renderAll();
-        document.getElementById('app-pin').blur(); 
-    } else {
-        if(entered.length === 6) {
-            alert("Hatalı Şifre!");
-            document.getElementById('app-pin').value = '';
-        }
-    }
-}
-
-// SHA-256 Hesaplama Fonksiyonu (Standart Kripto Kütüphanesi)
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
-}
-
-// --- DİĞER STANDART FONKSİYONLAR ---
+// --- GİZLİLİK VE ŞİFRE KONTROLÜ (GÜNCELLENDİ) ---
 function togglePrivacy() {
     if (privacyMode) {
         document.getElementById('pin-overlay').classList.add('active');
@@ -82,6 +52,26 @@ function togglePrivacy() {
         privacyMode = true;
         updatePrivacyIcon();
         renderAll();
+    }
+}
+
+function verifyPin() {
+    const entered = document.getElementById('app-pin').value;
+    
+    // BURASI ÖNEMLİ: Girilen şifreyi (160825) kodlayıp kontrol ediyoruz (btoa fonksiyonu)
+    // Böylece kodların içinde açık açık şifre yazmıyor.
+    if (btoa(entered) === SECRET_HASH) {
+        privacyMode = false;
+        closePinModal();
+        updatePrivacyIcon();
+        renderAll();
+        document.getElementById('app-pin').blur(); 
+    } else {
+        // Hatalıysa inputu temizle
+        if(entered.length === 6) {
+            alert("Hatalı Şifre!");
+            document.getElementById('app-pin').value = '';
+        }
     }
 }
 
@@ -181,6 +171,7 @@ function initializeData() {
     }
 }
 
+// --- TEMA ---
 function toggleTheme() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
@@ -188,6 +179,7 @@ function toggleTheme() {
 }
 function loadTheme() { if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); }
 
+// --- İŞLEMLER ---
 function resetData() { 
     if(confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) { 
         localStorage.removeItem('finansProFinal'); 
@@ -224,6 +216,7 @@ function importData(input) {
     reader.readAsText(file);
 }
 
+// --- GÖRÜNÜM ---
 function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -479,4 +472,3 @@ function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').repl
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
-

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Finans Pro</title>
+    <title>Finans Pro Max</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -25,7 +25,7 @@
         <div class="balance-card">
             <span id="current-status-title">GENEL DURUM</span>
             <h2 id="grand-total">0,00 ₺</h2>
-            <small id="status-subtitle">Hesaplanıyor...</small>
+            <small id="status-subtitle">Bağlanıyor...</small>
         </div>
 
         <nav class="nav-menu">
@@ -84,14 +84,19 @@
         </div>
 
         <div id="view-transactions" class="view-section">
-            <div class="table-header">
+            <div class="table-header mobile-col">
                 <h2>Hareket Geçmişi</h2>
-                <div class="filter-tabs">
-                    <button class="filter-tab active" onclick="filterTransactions('all')">Tümü</button>
-                    <button class="filter-tab" onclick="filterTransactions('income')">Gelir</button>
-                    <button class="filter-tab" onclick="filterTransactions('expense')">Gider</button>
+                <div class="filter-group">
+                    <input type="month" id="trans-month-filter" class="date-filter" onchange="renderTransactions()">
                 </div>
             </div>
+            
+            <div class="filter-tabs">
+                <button class="filter-tab active" onclick="setTransFilter('all')">Tümü</button>
+                <button class="filter-tab" onclick="setTransFilter('income')">Gelir</button>
+                <button class="filter-tab" onclick="setTransFilter('expense')">Gider</button>
+            </div>
+            
             <div id="transaction-list" class="transaction-list"></div>
         </div>
 

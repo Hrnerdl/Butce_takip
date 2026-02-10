@@ -2,9 +2,8 @@
 const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
 const BIN_ID = '6989e40ad0ea881f40ad271b';   
 
-// DİKKAT: Şifreniz () burada gizlendi. 
-// F12 ile bakanlar sadece bu karışık kodu görecek:
-const SECRET_HASH = "MTYwODI1"; 
+
+const PIN_HASH = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
@@ -41,7 +40,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// --- GİZLİLİK VE ŞİFRE KONTROLÜ (GÜNCELLENDİ) ---
+// --- GÜVENLİ ŞİFRE DOĞRULAMA (SHA-256) ---
+async function verifyPin() {
+    const entered = document.getElementById('app-pin').value;
+    
+    // Girilen şifrenin Hash'ini hesapla
+    const hash = await sha256(entered);
+
+    // Hesaplanan hash, bizim kaydettiğimiz hash ile aynı mı?
+    if (hash === PIN_HASH) {
+        privacyMode = false;
+        closePinModal();
+        updatePrivacyIcon();
+        renderAll();
+        document.getElementById('app-pin').blur(); 
+    } else {
+        if(entered.length === 6) {
+            alert("Hatalı Şifre!");
+            document.getElementById('app-pin').value = '';
+        }
+    }
+}
+
+// SHA-256 Hesaplama Fonksiyonu (Standart Kripto Kütüphanesi)
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+// --- DİĞER STANDART FONKSİYONLAR ---
 function togglePrivacy() {
     if (privacyMode) {
         document.getElementById('pin-overlay').classList.add('active');
@@ -52,26 +82,6 @@ function togglePrivacy() {
         privacyMode = true;
         updatePrivacyIcon();
         renderAll();
-    }
-}
-
-function verifyPin() {
-    const entered = document.getElementById('app-pin').value;
-    
-    // BURASI ÖNEMLİ: Girilen şifreyi (160825) kodlayıp kontrol ediyoruz (btoa fonksiyonu)
-    // Böylece kodların içinde açık açık şifre yazmıyor.
-    if (btoa(entered) === SECRET_HASH) {
-        privacyMode = false;
-        closePinModal();
-        updatePrivacyIcon();
-        renderAll();
-        document.getElementById('app-pin').blur(); 
-    } else {
-        // Hatalıysa inputu temizle
-        if(entered.length === 6) {
-            alert("Hatalı Şifre!");
-            document.getElementById('app-pin').value = '';
-        }
     }
 }
 
@@ -171,7 +181,6 @@ function initializeData() {
     }
 }
 
-// --- TEMA ---
 function toggleTheme() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
@@ -179,7 +188,6 @@ function toggleTheme() {
 }
 function loadTheme() { if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); }
 
-// --- İŞLEMLER ---
 function resetData() { 
     if(confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) { 
         localStorage.removeItem('finansProFinal'); 
@@ -216,7 +224,6 @@ function importData(input) {
     reader.readAsText(file);
 }
 
-// --- GÖRÜNÜM ---
 function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));

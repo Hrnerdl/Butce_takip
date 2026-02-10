@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Finans Pro Max</title>
+    <title>Finans Pro</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -17,14 +17,19 @@
     <aside class="sidebar">
         <header>
             <h1><i class="fas fa-wallet"></i> Finans Pro</h1>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Karanlık Mod">
-                <i class="fas fa-adjust"></i>
-            </button>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="togglePrivacy()" title="Gizle/Göster">
+                    <i class="fas fa-eye-slash" id="privacy-icon"></i>
+                </button>
+                <button class="icon-btn" onclick="toggleTheme()" title="Tema">
+                    <i class="fas fa-adjust"></i>
+                </button>
+            </div>
         </header>
 
         <div class="balance-card">
             <span id="current-status-title">GENEL DURUM</span>
-            <h2 id="grand-total">0,00 ₺</h2>
+            <h2 id="grand-total">**** ₺</h2>
             <small id="status-subtitle">Bağlanıyor...</small>
         </div>
 
@@ -51,7 +56,6 @@
     </aside>
 
     <main class="main-content">
-        
         <div id="view-dashboard" class="view-section active">
             <div class="table-header">
                 <h2>Finansal Genel Bakış</h2>
@@ -61,23 +65,13 @@
                     <option value="2028">2028</option>
                 </select>
             </div>
-
             <div class="chart-container-box">
                 <canvas id="financeChart"></canvas>
             </div>
-            
             <h3 class="section-sub-title">Aylık Nakit Akışı</h3>
             <div class="table-scroll-container">
                 <table class="dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>Dönem</th>
-                            <th class="text-right">Gelir</th>
-                            <th class="text-right">Kredi (1/3)</th>
-                            <th class="text-right">Harcama</th>
-                            <th class="text-right">Net</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Dönem</th><th class="text-right">Gelir</th><th class="text-right">Kredi</th><th class="text-right">Harcama</th><th class="text-right">Net</th></tr></thead>
                     <tbody id="dashboard-body"></tbody>
                 </table>
             </div>
@@ -90,13 +84,11 @@
                     <input type="month" id="trans-month-filter" class="date-filter" onchange="renderTransactions()">
                 </div>
             </div>
-            
             <div class="filter-tabs">
                 <button class="filter-tab active" onclick="setTransFilter('all')">Tümü</button>
                 <button class="filter-tab" onclick="setTransFilter('income')">Gelir</button>
                 <button class="filter-tab" onclick="setTransFilter('expense')">Gider</button>
             </div>
-            
             <div id="transaction-list" class="transaction-list"></div>
         </div>
 
@@ -107,7 +99,6 @@
             </div>
             <div id="loan-list-full" class="loan-grid"></div>
         </div>
-
     </main>
 </div>
 
@@ -123,31 +114,34 @@
     </div>
 </div>
 
+<div id="pin-overlay" class="modal-overlay" style="z-index: 2000; backdrop-filter: blur(10px);">
+    <div class="modal-card" style="max-width: 300px; text-align: center;">
+        <div class="modal-header" style="justify-content: center; border:none;">
+            <h3><i class="fas fa-lock"></i> Kilitli</h3>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 20px; color: var(--text-sec);">Verileri görmek için şifreni gir:</p>
+            <input type="tel" id="app-pin" placeholder="******" style="text-align: center; font-size: 24px; letter-spacing: 5px; margin-bottom: 20px;" maxlength="6">
+            
+            <button class="btn btn-blue" style="width: 100%;" onclick="verifyPin()">AÇ</button>
+            <button class="btn-text" style="width: 100%; margin-top: 15px; justify-content: center;" onclick="closePinModal()">Vazgeç</button>
+        </div>
+    </div>
+</div>
+
 <div id="pdf-template" style="display:none;">
     <div class="pdf-container">
-        <div class="pdf-header">
-            <h1>FİNANSAL DURUM RAPORU</h1>
-            <p id="pdf-month-title">Dönem: --</p>
-        </div>
+        <div class="pdf-header"><h1>FİNANSAL DURUM RAPORU</h1><p id="pdf-month-title">--</p></div>
         <div class="pdf-summary">
-            <div class="p-box p-green"><span>TOPLAM GELİR</span><h3 id="pdf-total-inc">0 ₺</h3></div>
-            <div class="p-box p-blue"><span>KREDİ (AYRILAN)</span><h3 id="pdf-total-loan">0 ₺</h3></div>
-            <div class="p-box p-red"><span>HARCAMALAR</span><h3 id="pdf-total-exp">0 ₺</h3></div>
-            <div class="p-box p-gray"><span>KALAN NET</span><h3 id="pdf-net">0 ₺</h3></div>
+            <div class="p-box p-green"><span>GELİR</span><h3 id="pdf-total-inc">0</h3></div>
+            <div class="p-box p-blue"><span>KREDİ</span><h3 id="pdf-total-loan">0</h3></div>
+            <div class="p-box p-red"><span>GİDER</span><h3 id="pdf-total-exp">0</h3></div>
+            <div class="p-box p-gray"><span>NET</span><h3 id="pdf-net">0</h3></div>
         </div>
-        <div class="pdf-section">
-            <h3><i class="fas fa-arrow-down"></i> Gelir Detayları</h3>
-            <table class="pdf-table" id="pdf-table-inc"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
-        </div>
-        <div class="pdf-section">
-            <h3><i class="fas fa-university"></i> Kredi Planı (Bu Ay)</h3>
-            <table class="pdf-table" id="pdf-table-loan"><thead><tr><th>Taksit</th><th>Vade</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
-        </div>
-        <div class="pdf-section">
-            <h3><i class="fas fa-arrow-up"></i> Harcama Detayları</h3>
-            <table class="pdf-table" id="pdf-table-exp"><thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table>
-        </div>
-        <div class="pdf-footer">Bu rapor Finans Pro tarafından oluşturulmuştur.</div>
+        <div class="pdf-section"><h3>Gelir Detayları</h3><table class="pdf-table" id="pdf-table-inc"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table></div>
+        <div class="pdf-section"><h3>Kredi Planı (Bu Ay)</h3><table class="pdf-table" id="pdf-table-loan"><thead><tr><th>Taksit</th><th>Vade</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table></div>
+        <div class="pdf-section"><h3>Harcama Detayları</h3><table class="pdf-table" id="pdf-table-exp"><thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th class="tr">Tutar</th></tr></thead><tbody></tbody></table></div>
+        <div class="pdf-footer">Rapor Tarihi: <span id="pdf-date"></span></div>
     </div>
 </div>
 

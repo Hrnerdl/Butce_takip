@@ -8,10 +8,9 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://www.svgrepo.com/download/315009/wallet.svg",
+      "src": "https://cdn-icons-png.flaticon.com/512/438/438526.png",
       "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }

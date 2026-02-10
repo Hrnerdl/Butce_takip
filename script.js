@@ -3,7 +3,7 @@ const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u';
 const BIN_ID = '6989e40ad0ea881f40ad271b';   
 
 
-const PIN_HASH = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+const PIN_HASH = "ef138a065220d9396749962803362a22904323e2002302325c75467556f8f742";
 
 // --- VERİ YAPISI ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
@@ -479,3 +479,4 @@ function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').repl
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
+

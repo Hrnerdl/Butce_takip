@@ -2,15 +2,15 @@
 const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
 const BIN_ID = '6989e40ad0ea881f40ad271b';   
 
-// DİKKAT: Şifreniz (160825) burada gizlendi. 
-// F12 ile bakanlar sadece bu karışık kodu görecek:
-const SECRET_HASH = "MTYwODI1"; 
 
-// --- VERİ YAPISI ---
+const SECRET_HASH = "MTYwODI1";
+
+// --- VERİ YAPISI VE DURUMLAR ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
 let myChart = null;
 let currentTransFilter = 'all'; 
 let privacyMode = true; 
+let pendingAction = null; // Şifre sonrası otomatik açılacak menüyü tutar
 
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = new Date().toISOString().slice(0, 7);
     document.getElementById('trans-month-filter').value = today;
     
-    // Otomatik Giriş Kontrolü
+    // Otomatik Şifre Kontrolü (6 Haneye Ulaşınca)
     const pinInput = document.getElementById('app-pin');
     if (pinInput) {
         pinInput.addEventListener('input', function() {
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// --- GİZLİLİK VE ŞİFRE KONTROLÜ (GÜNCELLENDİ) ---
+// --- GÜVENLİK VE GİZLİLİK (SHA-256) ---
 function togglePrivacy() {
     if (privacyMode) {
         document.getElementById('pin-overlay').classList.add('active');
@@ -55,19 +55,23 @@ function togglePrivacy() {
     }
 }
 
-function verifyPin() {
+async function verifyPin() {
     const entered = document.getElementById('app-pin').value;
-    
-    // BURASI ÖNEMLİ: Girilen şifreyi (160825) kodlayıp kontrol ediyoruz (btoa fonksiyonu)
-    // Böylece kodların içinde açık açık şifre yazmıyor.
-    if (btoa(entered) === SECRET_HASH) {
+    const hash = await sha256(entered); 
+
+    if (hash === PIN_HASH) {
         privacyMode = false;
         closePinModal();
         updatePrivacyIcon();
         renderAll();
         document.getElementById('app-pin').blur(); 
+        
+        // Eğer Rapor Al butonundan gelindiyse PDF menüsünü otomatik aç
+        if (pendingAction === 'pdf') {
+            pendingAction = null; 
+            openModal('pdf');     
+        }
     } else {
-        // Hatalıysa inputu temizle
         if(entered.length === 6) {
             alert("Hatalı Şifre!");
             document.getElementById('app-pin').value = '';
@@ -75,8 +79,16 @@ function verifyPin() {
     }
 }
 
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function closePinModal() {
     document.getElementById('pin-overlay').classList.remove('active');
+    pendingAction = null; // Kapatılırsa bekleyen işlemi iptal et
 }
 
 function updatePrivacyIcon() {
@@ -95,7 +107,7 @@ function formatMoney(n) {
     return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
 }
 
-// --- BULUT ---
+// --- BULUT SENKRONİZASYONU ---
 async function syncFromCloud() {
     updateStatusText("Bağlanıyor...", "orange");
     try {
@@ -171,7 +183,7 @@ function initializeData() {
     }
 }
 
-// --- TEMA ---
+// --- TEMA VE AYARLAR ---
 function toggleTheme() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
@@ -179,7 +191,6 @@ function toggleTheme() {
 }
 function loadTheme() { if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); }
 
-// --- İŞLEMLER ---
 function resetData() { 
     if(confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) { 
         localStorage.removeItem('finansProFinal'); 
@@ -205,7 +216,7 @@ function importData(input) {
         try {
             const json = JSON.parse(e.target.result);
             if(json.loans && json.expenses) {
-                if(confirm("Yedek yüklenecek?")) {
+                if(confirm("Yedek yüklenecek? Mevcut veriler silinir.")) {
                     data = json;
                     saveData();
                     location.reload();
@@ -221,13 +232,16 @@ function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${viewId}`).classList.add('active');
+    
     const navs = document.querySelectorAll('.nav-btn');
     if(viewId==='dashboard') navs[0].classList.add('active');
     if(viewId==='transactions') { navs[1].classList.add('active'); renderTransactions(); }
     if(viewId==='loans') navs[2].classList.add('active');
 }
+
 function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); renderTransactions(); }
 
+// --- DASHBOARD ---
 function renderDashboard() {
     const tbody = document.getElementById('dashboard-body');
     const year = document.getElementById('year-filter').value;
@@ -293,6 +307,7 @@ function updateCurrentStatusCard() {
     document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
 }
 
+// --- HAREKETLER ---
 function setTransFilter(type) {
     currentTransFilter = type;
     document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
@@ -339,6 +354,7 @@ function deleteItem(type, id) {
     saveData(); renderTransactions();
 }
 
+// --- KREDİLER ---
 function renderLoans() {
     const c = document.getElementById('loan-list-full'); c.innerHTML='';
     data.loans.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -354,18 +370,21 @@ function editLoan(id) {
     if(val) { l.total = parseTrMoney(val); saveData(); }
 }
 
+// --- MODAL VE FORMLAR ---
 let modalType = '';
 let editMode = false;
 let editId = null;
 
 function openModal(type) {
-    // --- YENİ GÜVENLİK KONTROLÜ ---
-    // Eğer PDF alınmak isteniyorsa ve gizlilik modu (****) açıksa engelle:
+    // --- Rapor Alırken Gizlilik Kontrolü ---
     if (type === 'pdf' && privacyMode) {
-        alert("🔒 Güvenlik Uyarısı: Rapor alabilmek için önce sol üstteki göz ikonuna tıklayarak şifrenizi girmeli ve verileri görünür yapmalısınız.");
-        return; // İşlemi burada durdur, menüyü açma.
+        pendingAction = 'pdf'; // Şifre doğru girildiğinde PDF'i açmasını söyler
+        document.getElementById('pin-overlay').classList.add('active');
+        const pinInput = document.getElementById('app-pin');
+        pinInput.value = '';
+        pinInput.focus();
+        return; // İşlemi durdur, PDF menüsünü açma
     }
-    // ------------------------------
 
     modalType = type;
     editMode = false;
@@ -427,7 +446,9 @@ function submitForm() {
     const amount = parseTrMoney(document.getElementById('inp-amount').value);
     const desc = document.getElementById('inp-desc') ? document.getElementById('inp-desc').value : '';
     const cat = document.getElementById('inp-cat') ? document.getElementById('inp-cat').value : '';
+    
     if(!date || isNaN(amount)) return alert("Eksik bilgi!");
+    
     if(modalType === 'loan') {
         data.loans.push({id:Date.now(), no:document.getElementById('inp-no').value, date, total:amount});
         switchView('loans');
@@ -435,8 +456,15 @@ function submitForm() {
         const list = modalType==='income' ? data.incomes : data.expenses;
         if (editMode && editId) {
             const existingItem = list.find(i => i.id === editId);
-            if (existingItem) { existingItem.date = date; existingItem.desc = desc; existingItem.amount = amount; if(modalType==='expense') existingItem.category = cat; }
-        } else { list.push({id:Date.now(), date, desc, category: cat, amount}); }
+            if (existingItem) { 
+                existingItem.date = date; 
+                existingItem.desc = desc; 
+                existingItem.amount = amount; 
+                if(modalType==='expense') existingItem.category = cat; 
+            }
+        } else { 
+            list.push({id:Date.now(), date, desc, category: cat, amount}); 
+        }
         renderTransactions();
     }
     saveData(); closeModal();
@@ -455,7 +483,10 @@ function generatePDF() {
 
     document.getElementById('pdf-month-title').innerText = `Dönem: ${getMonthName(m)} ${y}`;
     document.getElementById('pdf-date').innerText = new Date().toLocaleDateString('tr-TR');
+    
+    // PDF her zaman açık rakamları basar (zaten buraya gelebilmek için şifre girmiş olması gerekir)
     const fmt = n => n.toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ₺';
+    
     document.getElementById('pdf-total-inc').innerText = fmt(totInc);
     document.getElementById('pdf-total-loan').innerText = fmt(lTotal);
     document.getElementById('pdf-total-exp').innerText = fmt(totExp);
@@ -472,7 +503,16 @@ function generatePDF() {
 
     const el = document.getElementById('pdf-template');
     el.style.display = 'block';
-    html2pdf().set({ margin:0, filename:`Rapor_${ym}.pdf`, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4'} }).from(el).save().then(()=>{ el.style.display='none'; closeModal(); });
+    html2pdf().set({ 
+        margin:0, 
+        filename:`Finans_Raporu_${ym}.pdf`, 
+        image:{type:'jpeg',quality:0.98}, 
+        html2canvas:{scale:2}, 
+        jsPDF:{unit:'mm',format:'a4'} 
+    }).from(el).save().then(()=>{ 
+        el.style.display='none'; 
+        closeModal(); 
+    });
 }
 
 function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
@@ -480,5 +520,3 @@ function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').repl
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
-
-

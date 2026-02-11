@@ -1,10 +1,9 @@
 // --- AYARLAR ---
 const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
 const BIN_ID = '6989e40ad0ea881f40ad271b';  
-const APP_PIN = "160825"; // Şifren
 
-
-
+// Şifreni doğrudan buraya yazıyoruz (Sorunsuz çalışması için)
+const APP_PIN = "160825";
 
 // --- VERİ YAPISI VE DURUMLAR ---
 let data = { loans: [], expenses: [], incomes: [], recurring: [] };
@@ -42,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// --- GÜVENLİK VE GİZLİLİK (SHA-256) ---
+// --- GİZLİLİK VE ŞİFRE DOĞRULAMA (BASİT VE KESİN ÇÖZÜM) ---
 function togglePrivacy() {
     if (privacyMode) {
         document.getElementById('pin-overlay').classList.add('active');
@@ -56,11 +55,11 @@ function togglePrivacy() {
     }
 }
 
-async function verifyPin() {
+function verifyPin() {
     const entered = document.getElementById('app-pin').value;
-    const hash = await sha256(entered); 
 
-    if (hash === PIN_HASH) {
+    // Girilen şifre direkt bizim belirlediğimiz şifreyle aynı mı diye bakıyor
+    if (entered === APP_PIN) {
         privacyMode = false;
         closePinModal();
         updatePrivacyIcon();
@@ -78,13 +77,6 @@ async function verifyPin() {
             document.getElementById('app-pin').value = '';
         }
     }
-}
-
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function closePinModal() {
@@ -379,12 +371,12 @@ let editId = null;
 function openModal(type) {
     // --- Rapor Alırken Gizlilik Kontrolü ---
     if (type === 'pdf' && privacyMode) {
-        pendingAction = 'pdf'; // Şifre doğru girildiğinde PDF'i açmasını söyler
+        pendingAction = 'pdf'; 
         document.getElementById('pin-overlay').classList.add('active');
         const pinInput = document.getElementById('app-pin');
         pinInput.value = '';
         pinInput.focus();
-        return; // İşlemi durdur, PDF menüsünü açma
+        return; 
     }
 
     modalType = type;
@@ -485,7 +477,6 @@ function generatePDF() {
     document.getElementById('pdf-month-title').innerText = `Dönem: ${getMonthName(m)} ${y}`;
     document.getElementById('pdf-date').innerText = new Date().toLocaleDateString('tr-TR');
     
-    // PDF her zaman açık rakamları basar (zaten buraya gelebilmek için şifre girmiş olması gerekir)
     const fmt = n => n.toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ₺';
     
     document.getElementById('pdf-total-inc').innerText = fmt(totInc);
@@ -521,5 +512,3 @@ function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').repl
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
-
-

@@ -35,7 +35,16 @@
 
         <div class="balance-card">
             <span id="current-status-title">GENEL DURUM</span>
-            <h2 id="grand-total">**** ₺</h2>
+            <div class="balance-split">
+                <div class="bal-box">
+                    <small>Cepte (Anlık)</small>
+                    <h2 id="current-balance">**** ₺</h2>
+                </div>
+                <div class="bal-box">
+                    <small>Ay Sonu (Beklenen)</small>
+                    <h2 id="grand-total">**** ₺</h2>
+                </div>
+            </div>
             <small id="status-subtitle">Bağlanıyor...</small>
         </div>
 
@@ -116,6 +125,19 @@
         </div>
         <div class="modal-body">
             <form id="active-form"></form>
+        </div>
+    </div>
+</div>
+
+<div id="confirmation-modal" class="modal-overlay" style="z-index: 1500;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3><i class="fas fa-bell" style="color:var(--green)"></i> Bekleyen İşlemler</h3>
+            <button onclick="closeConfirmationModal()" class="close-icon"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 13px; color: var(--text-sec); margin-bottom:15px;">Aşağıdaki işlemlerin tarihi geldi. Gerçekleşen tutarları düzenleyip onaylayabilirsiniz.</p>
+            <div id="confirmation-list" style="max-height: 300px; overflow-y: auto;"></div>
         </div>
     </div>
 </div>

@@ -2,7 +2,6 @@
 const API_KEY = '$2a$10$4vZ/QQaLv1Feei70sXV03O7N.OypbKyIDmz.6khENL85GRk1ObT3u'; 
 const BIN_ID = '6989e40ad0ea881f40ad271b';  
 
-// Şifreni doğrudan buraya yazıyoruz (Sorunsuz çalışması için)
 const APP_PIN = "160825";
 
 // --- VERİ YAPISI VE DURUMLAR ---
@@ -10,7 +9,7 @@ let data = { loans: [], expenses: [], incomes: [], recurring: [] };
 let myChart = null;
 let currentTransFilter = 'all'; 
 let privacyMode = true; 
-let pendingAction = null; // Şifre sonrası otomatik açılacak menüyü tutar
+let pendingAction = null; 
 
 const PRELOADED_LOANS = [
     { id: 101, no: 1, date: '2026-05-06', total: 151347.22 },
@@ -28,7 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = new Date().toISOString().slice(0, 7);
     document.getElementById('trans-month-filter').value = today;
     
-    // Otomatik Şifre Kontrolü (6 Haneye Ulaşınca)
+    // Web Bildirim İzni (Uygulama açıkken uyarabilmesi için)
+    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+    }
+    
     const pinInput = document.getElementById('app-pin');
     if (pinInput) {
         pinInput.addEventListener('input', function() {
@@ -41,7 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// --- GİZLİLİK VE ŞİFRE DOĞRULAMA (BASİT VE KESİN ÇÖZÜM) ---
+// Verilerdeki isConfirmed eksiklerini tamamla (Geriye dönük uyumluluk)
+function ensureConfirmedState() {
+    if(!data.incomes) data.incomes = [];
+    if(!data.expenses) data.expenses = [];
+    data.incomes.forEach(i => { if(i.isConfirmed === undefined) i.isConfirmed = true; });
+    data.expenses.forEach(e => { if(e.isConfirmed === undefined) e.isConfirmed = true; });
+}
+
+// --- GİZLİLİK VE ŞİFRE DOĞRULAMA ---
 function togglePrivacy() {
     if (privacyMode) {
         document.getElementById('pin-overlay').classList.add('active');
@@ -58,7 +69,6 @@ function togglePrivacy() {
 function verifyPin() {
     const entered = document.getElementById('app-pin').value;
 
-    // Girilen şifre direkt bizim belirlediğimiz şifreyle aynı mı diye bakıyor
     if (entered === APP_PIN) {
         privacyMode = false;
         closePinModal();
@@ -66,7 +76,8 @@ function verifyPin() {
         renderAll();
         document.getElementById('app-pin').blur(); 
         
-        // Eğer Rapor Al butonundan gelindiyse PDF menüsünü otomatik aç
+        checkPendingTransactions(); 
+
         if (pendingAction === 'pdf') {
             pendingAction = null; 
             openModal('pdf');     
@@ -81,7 +92,7 @@ function verifyPin() {
 
 function closePinModal() {
     document.getElementById('pin-overlay').classList.remove('active');
-    pendingAction = null; // Kapatılırsa bekleyen işlemi iptal et
+    pendingAction = null; 
 }
 
 function updatePrivacyIcon() {
@@ -113,6 +124,7 @@ async function syncFromCloud() {
             const json = await response.json();
             if(json.record && (json.record.loans || json.record.incomes)) {
                 data = json.record;
+                ensureConfirmedState();
                 localStorage.setItem('finansProFinal', JSON.stringify(data));
                 updateStatusText("Bulut Aktif ✅", "green");
             } else {
@@ -126,7 +138,7 @@ async function syncFromCloud() {
         console.error("Bulut Hatası:", error);
         updateStatusText("Yerel Mod ⚠️", "red");
         const stored = localStorage.getItem('finansProFinal');
-        if (stored) data = JSON.parse(stored);
+        if (stored) { data = JSON.parse(stored); ensureConfirmedState(); }
         else initializeData();
     }
 }
@@ -171,7 +183,8 @@ function initializeData() {
             date: `2026-${monthStr}-15`, 
             desc: 'Maaş', 
             category: 'Maaş', 
-            amount: 67000 
+            amount: 67000,
+            isConfirmed: true
         });
     }
 }
@@ -211,6 +224,7 @@ function importData(input) {
             if(json.loans && json.expenses) {
                 if(confirm("Yedek yüklenecek? Mevcut veriler silinir.")) {
                     data = json;
+                    ensureConfirmedState();
                     saveData();
                     location.reload();
                 }
@@ -220,7 +234,7 @@ function importData(input) {
     reader.readAsText(file);
 }
 
-// --- GÖRÜNÜM ---
+// --- GÖRÜNÜM VE ONAY KONTROLLERİ ---
 function switchView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -233,6 +247,68 @@ function switchView(viewId) {
 }
 
 function renderAll() { renderDashboard(); renderLoans(); updateCurrentStatusCard(); renderTransactions(); }
+
+function checkPendingTransactions() {
+    const today = new Date().toISOString().split('T')[0];
+    let pending = [];
+    
+    data.incomes.forEach(i => { if(i.date <= today && i.isConfirmed === false) pending.push({...i, _type: 'incomes'}); });
+    data.expenses.forEach(e => { if(e.date <= today && e.isConfirmed === false) pending.push({...e, _type: 'expenses'}); });
+    
+    if(pending.length > 0) {
+        showConfirmationModal(pending);
+        // Eğer cihaz bildirimlerine izin verildiyse app açıkken de uyarır
+        if (Notification.permission === "granted") {
+            new Notification("Finans Pro - Onay Bekliyor", {
+                body: `Bugün veya öncesine ait ${pending.length} adet onaylanmamış işleminiz var.`,
+                icon: "https://cdn-icons-png.flaticon.com/512/438/438526.png"
+            });
+        }
+    }
+}
+
+function showConfirmationModal(pendingItems) {
+    const modalContent = document.getElementById('confirmation-list');
+    modalContent.innerHTML = '';
+
+    pendingItems.forEach(item => {
+        const isInc = item._type === 'incomes';
+        modalContent.innerHTML += `
+            <div class="confirmation-item" id="conf-${item.id}" style="border-left: 4px solid ${isInc?'var(--green)':'var(--red)'}">
+                <div class="conf-details">
+                    <strong>${item.desc}</strong> <br>
+                    <small>${formatDateTR(item.date)} - ${item.category || 'Genel'}</small>
+                </div>
+                <div class="conf-actions">
+                    <input type="number" id="input-amount-${item.id}" value="${item.amount}" class="edit-amount-input" step="0.01">
+                    <button class="btn-confirm" onclick="confirmTransaction(${item.id}, '${item._type}')">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    document.getElementById('confirmation-modal').classList.add('active');
+}
+
+function confirmTransaction(itemId, type) {
+    const updatedAmt = parseFloat(document.getElementById(`input-amount-${itemId}`).value);
+    if(isNaN(updatedAmt) || updatedAmt <= 0) return alert("Lütfen geçerli bir tutar girin.");
+
+    let itemIndex = data[type].findIndex(i => i.id === itemId);
+    if(itemIndex !== -1) {
+        data[type][itemIndex].amount = updatedAmt;
+        data[type][itemIndex].isConfirmed = true;
+
+        document.getElementById(`conf-${itemId}`).remove();
+        saveData();
+
+        const remaining = document.querySelectorAll('.confirmation-item');
+        if(remaining.length === 0) closeConfirmationModal();
+    }
+}
+
+function closeConfirmationModal() { document.getElementById('confirmation-modal').classList.remove('active'); }
 
 // --- DASHBOARD ---
 function renderDashboard() {
@@ -292,12 +368,27 @@ function updateChart(labels, inc, exp, year, isDark) {
 function updateCurrentStatusCard() {
     const date = new Date();
     const ym = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}`;
-    const income = data.incomes.filter(i => i.date.startsWith(ym)).reduce((s,i)=>s+i.amount,0);
-    const expense = data.expenses.filter(e => e.date.startsWith(ym)).reduce((s,e)=>s+e.amount,0);
+    
+    let currentInc = 0, projectedInc = 0;
+    data.incomes.filter(i => i.date.startsWith(ym)).forEach(i => {
+        projectedInc += i.amount;
+        if(i.isConfirmed) currentInc += i.amount;
+    });
+
+    let currentExp = 0, projectedExp = 0;
+    data.expenses.filter(e => e.date.startsWith(ym)).forEach(e => {
+        projectedExp += e.amount;
+        if(e.isConfirmed) currentExp += e.amount;
+    });
+
     let credit = 0;
     data.loans.forEach(l => { if (isLoanActiveMonth(l.date, ym)) credit += (l.total/3); });
+    
     document.getElementById('current-status-title').innerText = `${date.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})} DURUM`.toUpperCase();
-    document.getElementById('grand-total').innerText = formatMoney(income - credit - expense);
+    
+    // Anlık bakiye (onaylananlar) ve Beklenen (tümü)
+    document.getElementById('current-balance').innerText = formatMoney(currentInc - credit - currentExp);
+    document.getElementById('grand-total').innerText = formatMoney(projectedInc - credit - projectedExp);
 }
 
 // --- HAREKETLER ---
@@ -325,10 +416,12 @@ function renderTransactions() {
     items.forEach(item => {
         const isInc = item.type==='income';
         const catBadge = item.category ? `<span class="cat-badge">${item.category}</span>` : '';
+        const confBadge = !item.isConfirmed ? `<span class="cat-badge" style="background:var(--red);color:white;border:none;">Bekliyor</span>` : '';
         const amountDisplay = formatMoney(item.amount); 
+        
         list.innerHTML += `
-        <div class="trans-item" style="border-left:4px solid ${isInc?'var(--green)':'var(--red)'}">
-            <div class="trans-left"><h4>${catBadge}${item.desc}</h4><p>${formatDateTR(item.date)}</p></div>
+        <div class="trans-item" style="border-left:4px solid ${isInc?'var(--green)':'var(--red)'}; opacity: ${item.isConfirmed ? '1' : '0.6'};">
+            <div class="trans-left"><h4>${confBadge}${catBadge}${item.desc}</h4><p>${formatDateTR(item.date)}</p></div>
             <div class="trans-right">
                 <span class="trans-amt" style="color:${isInc?'var(--green)':'var(--red)'}">${isInc?'+':'-'}${amountDisplay}</span>
                 <div class="trans-actions">
@@ -369,7 +462,6 @@ let editMode = false;
 let editId = null;
 
 function openModal(type) {
-    // --- Rapor Alırken Gizlilik Kontrolü ---
     if (type === 'pdf' && privacyMode) {
         pendingAction = 'pdf'; 
         document.getElementById('pin-overlay').classList.add('active');
@@ -415,6 +507,9 @@ function renderModalContent(type, actionText, item = null) {
         let valAmt = item ? item.amount.toLocaleString('tr-TR',{minimumFractionDigits:2}) : '';
         let valCat = item ? item.category : '';
         let valLoanNo = type==='loan' && item ? item.no : '';
+        
+        let installInput = (!editMode && type !== 'loan') ? `<label>Taksit / Tekrar (Ay)</label><input type="number" id="inp-install" value="1" min="1" max="36">` : '';
+
         let extra = type === 'expense' ? `
             <label>Kategori</label>
             <select id="inp-cat">
@@ -422,14 +517,24 @@ function renderModalContent(type, actionText, item = null) {
                 <option value="Fatura" ${valCat==='Fatura'?'selected':''}>Fatura</option>
                 <option value="Ulaşım" ${valCat==='Ulaşım'?'selected':''}>Ulaşım</option>
                 <option value="Diğer" ${valCat==='Diğer'?'selected':''}>Diğer</option>
-            </select>` : (type === 'loan' ? `<label>Taksit No</label><input type="number" id="inp-no" value="${valLoanNo}">` : '');
+            </select>
+            ${installInput}` : (type === 'loan' ? `<label>Taksit No</label><input type="number" id="inp-no" value="${valLoanNo}">` : installInput);
+            
+        // iOS Takvim Checkbox'ı
+        let calendarCheckbox = (!editMode) ? `
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; margin-bottom:15px; background: rgba(9, 132, 227, 0.05); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                <input type="checkbox" id="inp-calendar" style="width:18px; height:18px; margin:0;" checked>
+                <label for="inp-calendar" style="margin:0; font-size:13px; cursor:pointer; color:var(--text-main);">Takvime Hatırlatıcı Ekle (09:00)</label>
+            </div>` : '';
+
         form.innerHTML = `
             ${type!=='loan' ? `<label>Tarih</label><input type="date" id="inp-date" value="${valDate}">` : ''}
             ${type==='loan' ? `<label>Vade Tarihi</label><input type="date" id="inp-date" value="${valDate}">` : ''}
             ${extra}
             ${type!=='loan' ? `<label>Açıklama</label><input type="text" id="inp-desc" value="${valDesc}">` : ''}
             <label>Tutar</label><input type="text" id="inp-amount" inputmode="decimal" value="${valAmt}">
-            <button type="button" class="btn ${type==='income'?'btn-green':(type==='expense'?'btn-red':'btn-blue')}" style="width:100%; margin-top:10px;" onclick="submitForm()">Kaydet</button>`;
+            ${calendarCheckbox}
+            <button type="button" class="btn ${type==='income'?'btn-green':(type==='expense'?'btn-red':'btn-blue')}" style="width:100%; margin-top:5px;" onclick="submitForm()">Kaydet</button>`;
     }
 }
 
@@ -439,11 +544,19 @@ function submitForm() {
     const amount = parseTrMoney(document.getElementById('inp-amount').value);
     const desc = document.getElementById('inp-desc') ? document.getElementById('inp-desc').value : '';
     const cat = document.getElementById('inp-cat') ? document.getElementById('inp-cat').value : '';
+    const installCount = document.getElementById('inp-install') ? parseInt(document.getElementById('inp-install').value) : 1;
+    const addToCalendar = document.getElementById('inp-calendar') ? document.getElementById('inp-calendar').checked : false;
     
     if(!date || isNaN(amount)) return alert("Eksik bilgi!");
+    const today = new Date().toISOString().split('T')[0];
+    let itemsForCalendar = []; 
     
     if(modalType === 'loan') {
-        data.loans.push({id:Date.now(), no:document.getElementById('inp-no').value, date, total:amount});
+        const newItem = {id:Date.now(), no:document.getElementById('inp-no').value, date, total:amount};
+        data.loans.push(newItem);
+        if(addToCalendar && date > today) {
+            itemsForCalendar.push({id: newItem.id, date: newItem.date, desc: `Kredi Taksiti #${newItem.no}`, amount: amount});
+        }
         switchView('loans');
     } else {
         const list = modalType==='income' ? data.incomes : data.expenses;
@@ -454,13 +567,43 @@ function submitForm() {
                 existingItem.desc = desc; 
                 existingItem.amount = amount; 
                 if(modalType==='expense') existingItem.category = cat; 
+                if(date > today) existingItem.isConfirmed = false;
+                else existingItem.isConfirmed = true;
             }
         } else { 
-            list.push({id:Date.now(), date, desc, category: cat, amount}); 
+            // Taksit Döngüsü
+            for (let i = 0; i < installCount; i++) {
+                let d = new Date(date);
+                d.setMonth(d.getMonth() + i); 
+                let newDateStr = d.toISOString().split('T')[0];
+                let isConf = newDateStr <= today; 
+                let finalDesc = installCount > 1 ? `${desc} (${i+1}/${installCount})` : desc;
+                
+                let newItem = {
+                    id: Date.now() + i, 
+                    date: newDateStr, 
+                    desc: finalDesc, 
+                    category: cat, 
+                    amount: amount,
+                    isConfirmed: isConf
+                };
+                list.push(newItem);
+                
+                // Sadece ileri tarihli olanları takvime ekle
+                if (addToCalendar && !isConf) {
+                    itemsForCalendar.push(newItem);
+                }
+            }
         }
         renderTransactions();
     }
-    saveData(); closeModal();
+    saveData(); 
+    closeModal();
+    
+    // Takvime eklenmesi gereken işlem varsa ICS dosyasını indir
+    if (itemsForCalendar.length > 0) {
+        downloadICS(itemsForCalendar);
+    }
 }
 
 function generatePDF() {
@@ -512,3 +655,40 @@ function parseTrMoney(s) { return typeof s==='number'?s:parseFloat((s||'0').repl
 function formatDateTR(d) { return d.split('-').reverse().join('.'); }
 function getMonthName(m) { return new Date(2023, m-1).toLocaleDateString('tr-TR', {month:'long'}); }
 function isLoanActiveMonth(l, c) { const d1=new Date(l), d2=new Date(c+'-01'); d1.setDate(1); const df=(d1.getFullYear()*12+d1.getMonth())-(d2.getFullYear()*12+d2.getMonth()); return df>=0 && df<3; }
+
+// --- TAKVİM (.ics) HATIRLATICI SİSTEMİ ---
+function downloadICS(items) {
+    let icsData = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Finans Pro//TR\n";
+
+    items.forEach(item => {
+        const dtStart = item.date.replace(/-/g, '') + 'T090000'; // Etkinlik saati 09:00
+        const dtEnd = item.date.replace(/-/g, '') + 'T091500';   // 15 dakikalık blok
+
+        icsData += "BEGIN:VEVENT\n";
+        icsData += `UID:${item.id}@finanspro\n`;
+        icsData += `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n`;
+        icsData += `DTSTART:${dtStart}\n`;
+        icsData += `DTEND:${dtEnd}\n`;
+        icsData += `SUMMARY:Finans Pro: ${item.desc}\n`;
+        icsData += `DESCRIPTION:Planlanan Tutar: ${item.amount} TL. Uygulamaya girip gerçekleşen tutarı onaylamayı unutmayın.\n`;
+        
+        // Ses çalmadan, 09:00'da ekrana düşen sessiz bildirim
+        icsData += "BEGIN:VALARM\n";
+        icsData += "TRIGGER:-PT0M\n";
+        icsData += "ACTION:DISPLAY\n";
+        icsData += "DESCRIPTION:Finans Pro Hatırlatıcı\n";
+        icsData += "END:VALARM\n";
+        
+        icsData += "END:VEVENT\n";
+    });
+
+    icsData += "END:VCALENDAR";
+
+    const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', `FinansPro_Hatirlatici.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}

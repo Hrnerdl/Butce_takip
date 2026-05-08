@@ -44,12 +44,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Verilerdeki isConfirmed eksiklerini tamamla (Geriye dönük uyumluluk)
+// Verilerdeki isConfirmed eksiklerini tamamla ve ileri tarihleri düzelt
 function ensureConfirmedState() {
+    const today = new Date().toISOString().split('T')[0]; // Bugünün tarihi
+    
     if(!data.incomes) data.incomes = [];
     if(!data.expenses) data.expenses = [];
-    data.incomes.forEach(i => { if(i.isConfirmed === undefined) i.isConfirmed = true; });
-    data.expenses.forEach(e => { if(e.isConfirmed === undefined) e.isConfirmed = true; });
+    
+    data.incomes.forEach(i => { 
+        if(i.isConfirmed === undefined) i.isConfirmed = true; 
+        // Eğer işlemin tarihi bugünden ileriyse, kesinlikle onaylanmamıştır (bekliyor yap)
+        if(i.date > today) i.isConfirmed = false; 
+    });
+    
+    data.expenses.forEach(e => { 
+        if(e.isConfirmed === undefined) e.isConfirmed = true; 
+        // Eğer işlemin tarihi bugünden ileriyse, kesinlikle onaylanmamıştır (bekliyor yap)
+        if(e.date > today) e.isConfirmed = false; 
+    });
 }
 
 // --- GİZLİLİK VE ŞİFRE DOĞRULAMA ---
